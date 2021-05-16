@@ -46,6 +46,7 @@ set(CPACK_DEBIAN_PACKAGE_SECTION "games")
 include(CPack)
 
 set(CHIAKI_IS_SWITCH ${NSWITCH})
+set(CHIAKI_IS_VITA ${VITA})
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_CURRENT_SOURCE_DIR}/setsu/cmake")
 
@@ -55,6 +56,10 @@ if(CHIAKI_IS_SWITCH)
 	# force mbedtls as crypto lib
 	set(CHIAKI_LIB_ENABLE_MBEDTLS ON)
 	add_definitions(-D__SWITCH__)
+endif()
+
+if(CHIAKI_IS_VITA)
+	add_definitions(-D__PSVITA__)
 endif()
 
 if(CHIAKI_USE_SYSTEM_JERASURE)

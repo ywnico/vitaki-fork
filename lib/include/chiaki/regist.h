@@ -10,6 +10,10 @@
 #include "rpcrypt.h"
 #include "session.h"
 
+#ifdef __PSVITA__
+#include <psp2/net/net.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

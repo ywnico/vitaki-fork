@@ -13,6 +13,11 @@
 #include <switch.h>
 #endif
 
+#ifdef __PSVITA__
+#include <psp2/kernel/processmgr.h>
+#include <debugnet.h>
+#endif
+
 #if _WIN32
 static DWORD WINAPI win32_thread_func(LPVOID param)
 {
@@ -181,7 +186,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_init(ChiakiCond *cond)
 	int r = pthread_condattr_init(&attr);
 	if(r != 0)
 		return CHIAKI_ERR_UNKNOWN;
-#if !__APPLE__
+#if !__APPLE__ && !__PSVITA__
 	r = pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
 	if(r != 0)
 	{
@@ -240,7 +245,13 @@ static ChiakiErrorCode chiaki_cond_timedwait_abs(ChiakiCond *cond, ChiakiMutex *
 
 static void set_timeout(struct timespec *timeout, uint64_t ms_from_now)
 {
-	clock_gettime(CLOCK_MONOTONIC, timeout);
+	#ifdef __PSVITA__
+		int time_us = sceKernelGetProcessTimeWide();
+		timeout->tv_sec = time_us / 1000000;
+		timeout->tv_nsec = (time_us % 1000000) * 1000;
+	#else
+		clock_gettime(CLOCK_MONOTONIC, timeout);
+	#endif
 	timeout->tv_sec += ms_from_now / 1000;
 	timeout->tv_nsec += (ms_from_now % 1000) * 1000000;
 	if(timeout->tv_nsec > 1000000000)

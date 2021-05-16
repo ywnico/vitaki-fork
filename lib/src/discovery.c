@@ -19,6 +19,11 @@
 #include <arpa/inet.h>
 #endif
 
+#ifdef __PSVITA__
+#include <debugnet.h>
+#define IN6ADDR_ANY_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } } }
+#endif
+
 const char *chiaki_discovery_host_state_string(ChiakiDiscoveryHostState state)
 {
 	switch(state)
@@ -145,7 +150,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_discovery_init(ChiakiDiscovery *discovery, 
 
 	discovery->log = log;
 
-	discovery->socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	#ifdef __PSVITA__
+		discovery->socket = sceNetSocket("", SCE_NET_AF_INET, SCE_NET_SOCK_DGRAM, SCE_NET_IPPROTO_UDP);
+	#else
+		discovery->socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	#endif
 	if(CHIAKI_SOCKET_IS_INVALID(discovery->socket))
 	{
 		CHIAKI_LOGE(discovery->log, "Discovery failed to create socket");
@@ -177,7 +186,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_discovery_init(ChiakiDiscovery *discovery, 
 			addr->sin_port = htons(port);
 		}
 
-		r = bind(discovery->socket, &discovery->local_addr, sizeof(discovery->local_addr));
+		#ifdef __PSVITA__
+		  r = sceNetBind(discovery->socket, (SceNetSockaddr*) &discovery->local_addr, sizeof(discovery->local_addr));
+		#else
+			r = bind(discovery->socket, &discovery->local_addr, sizeof(discovery->local_addr));
+		#endif
 		if(r >= 0 || !port)
 			break;
 		if(port == CHIAKI_DISCOVERY_PORT_LOCAL_MAX)
@@ -202,7 +215,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_discovery_init(ChiakiDiscovery *discovery, 
 	}
 
 	const int broadcast = 1;
-	r = setsockopt(discovery->socket, SOL_SOCKET, SO_BROADCAST, (const void *)&broadcast, sizeof(broadcast));
+	#ifdef __PSVITA__
+		r = sceNetSetsockopt(discovery->socket, SCE_NET_SOL_SOCKET, SCE_NET_SO_BROADCAST, (const void *)&broadcast, sizeof(broadcast));
+	#else
+		r = setsockopt(discovery->socket, SOL_SOCKET, SO_BROADCAST, (const void *)&broadcast, sizeof(broadcast));
+	#endif
 	if(r < 0)
 		CHIAKI_LOGE(discovery->log, "Discovery failed to setsockopt SO_BROADCAST");
 
@@ -238,7 +255,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_discovery_send(ChiakiDiscovery *discovery, 
 	int rc = sendto_broadcast(discovery->log, discovery->socket, buf, (size_t)len + 1, 0, addr, addr_size);
 	if(rc < 0)
 	{
+		#ifdef __PSVITA__
+		CHIAKI_LOGE(discovery->log, "Discovery failed to send: 0x%x", rc);
+		#else
 		CHIAKI_LOGE(discovery->log, "Discovery failed to send: %s", strerror(errno));
+		#endif
 		return CHIAKI_ERR_NETWORK;
 	}
 
@@ -290,35 +311,46 @@ static void *discovery_thread_func(void *user)
 
 	while(1)
 	{
+		CHIAKI_LOGD(discovery->log, "Discovery selecting with stop pipe");
 		ChiakiErrorCode err = chiaki_stop_pipe_select_single(&thread->stop_pipe, discovery->socket, false, UINT64_MAX);
-		if(err == CHIAKI_ERR_CANCELED)
+		CHIAKI_LOGD(discovery->log, "Discovery selecting with stop pipe done, got 0x%x", err);
+		if(err == CHIAKI_ERR_CANCELED) {
+			CHIAKI_LOGD(discovery->log, "Discovery selecting with stop pipe was canceled");
 			break;
+		}
 		if(err != CHIAKI_ERR_SUCCESS)
 		{
 			CHIAKI_LOGE(discovery->log, "Discovery thread failed to select");
 			break;
 		}
 
+		CHIAKI_LOGD(discovery->log, "Discovery thread is reading from socket");
 		char buf[512];
 		struct sockaddr client_addr;
 		socklen_t client_addr_size = sizeof(client_addr);
-		int n = recvfrom(discovery->socket, buf, sizeof(buf) - 1, 0, &client_addr, &client_addr_size);
+		#ifdef __PSVITA__
+			int n = sceNetRecvfrom(discovery->socket, buf, sizeof(buf) - 1, 0, (SceNetSockaddr*) &client_addr, &client_addr_size);
+		#else
+			int n = recvfrom(discovery->socket, buf, sizeof(buf) - 1, 0, &client_addr, &client_addr_size);
+		#endif
 		if(n < 0)
 		{
 			CHIAKI_LOGE(discovery->log, "Discovery thread failed to read from socket");
 			break;
 		}
 
-		if(n == 0)
+		if(n == 0) {
+			CHIAKI_LOGD(discovery->log, "Got empty response, trying again");
 			continue;
+		}
 
 		if(n > sizeof(buf) - 1)
 			n = sizeof(buf) - 1;
 
 		buf[n] = '\00';
 
-		//CHIAKI_LOGV(discovery->log, "Discovery received:\n%s", buf);
-		//chiaki_log_hexdump_raw(discovery->log, CHIAKI_LOG_VERBOSE, (const uint8_t *)buf, n);
+		CHIAKI_LOGV(discovery->log, "Discovery received:\n%s", buf);
+		chiaki_log_hexdump_raw(discovery->log, CHIAKI_LOG_VERBOSE, (const uint8_t *)buf, n);
 
 		char addr_buf[64];
 		ChiakiDiscoveryHost response;

@@ -20,6 +20,10 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#elif defined(__PSVITA__)
+#include <unistd.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #else
 #include <unistd.h>
 #include <netinet/in.h>

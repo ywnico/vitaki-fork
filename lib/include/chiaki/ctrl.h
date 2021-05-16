@@ -14,6 +14,10 @@
 #include <winsock2.h>
 #endif
 
+#ifdef __PSVITA__
+#include <psp2/net/net.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

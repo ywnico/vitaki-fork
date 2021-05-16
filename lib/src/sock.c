@@ -9,6 +9,10 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_socket_set_nonblock(chiaki_socket_t sock, b
 	u_long nbio = nonblock ? 1 : 0;
 	if(ioctlsocket(sock, FIONBIO, &nbio) != NO_ERROR)
 		return CHIAKI_ERR_UNKNOWN;
+#elif defined(__PSVITA__)
+int nbio = nonblock ? 1 : 0;
+	if (sceNetSetsockopt(sock, SCE_NET_SOL_SOCKET, SCE_NET_SO_NBIO, &nbio, sizeof(int)) < 0) 
+		return CHIAKI_ERR_UNKNOWN;
 #else
 	int flags = fcntl(sock, F_GETFL, 0);
 	if(flags == -1)

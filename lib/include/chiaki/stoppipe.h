@@ -23,7 +23,7 @@ typedef struct chiaki_stop_pipe_t
 {
 #ifdef _WIN32
 	WSAEVENT event;
-#elif defined(__SWITCH__)
+#elif defined(__SWITCH__) || defined(__PSVITA__)
 	// due to a lack pipe/event/socketpair
 	// on switch env, we use a physical socket
 	// to send/trigger the cancel signal
@@ -34,6 +34,9 @@ typedef struct chiaki_stop_pipe_t
 	int fd;
 #else
 	int fds[2];
+#endif
+#ifdef __PSVITA__
+  int epoll_fd;
 #endif
 } ChiakiStopPipe;
 

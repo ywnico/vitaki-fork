@@ -24,8 +24,9 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_discovery_service_init(ChiakiDiscoveryServi
 	service->ping_index = 0;
 
 	service->hosts = calloc(service->options.hosts_max, sizeof(ChiakiDiscoveryHost));
-	if(!service->hosts)
+	if(!service->hosts) {
 		return CHIAKI_ERR_MEMORY;
+	}
 
 	ChiakiErrorCode err;
 	service->host_discovery_infos = calloc(service->options.hosts_max, sizeof(ChiakiDiscoveryServiceHostDiscoveryInfo));
@@ -81,8 +82,11 @@ error_hosts:
 
 CHIAKI_EXPORT void chiaki_discovery_service_fini(ChiakiDiscoveryService *service)
 {
+	CHIAKI_LOGD(service->log, "Triggering stop condition.");
 	chiaki_bool_pred_cond_signal(&service->stop_cond);
+	CHIAKI_LOGD(service->log, "Joining discovery thread");
 	chiaki_thread_join(&service->thread, NULL);
+	CHIAKI_LOGD(service->log, "Cleaning up memory");
 	chiaki_bool_pred_cond_fini(&service->stop_cond);
 	chiaki_discovery_fini(&service->discovery);
 	chiaki_mutex_fini(&service->state_mutex);
@@ -116,11 +120,14 @@ static void *discovery_service_thread_func(void *user)
 	while(true)
 	{
 		err = chiaki_bool_pred_cond_timedwait(&service->stop_cond, service->options.ping_ms);
-		if(err != CHIAKI_ERR_TIMEOUT)
+		if(err != CHIAKI_ERR_TIMEOUT) {
+			CHIAKI_LOGD(service->log, "Timeout while pinging.");
 			break;
+		}
 		discovery_service_ping(service);
 	}
 
+	CHIAKI_LOGD(service->log, "Stopping discovery thread.");
 	chiaki_discovery_thread_stop(&discovery_thread);
 
 beach:
@@ -153,7 +160,7 @@ static void discovery_service_ping(ChiakiDiscoveryService *service)
 	}
 	err = chiaki_discovery_send(&service->discovery, &packet, service->options.send_addr, service->options.send_addr_size);
 	if(err != CHIAKI_ERR_SUCCESS)
-		CHIAKI_LOGE(service->log, "Discovery Service failed to send ping for PS4");
+		CHIAKI_LOGE(service->log, "Discovery Service failed to send ping for PS4, error was %s (%d)", chiaki_error_string(err), err);
 	packet.protocol_version = CHIAKI_DISCOVERY_PROTOCOL_VERSION_PS5;
 	if(service->options.send_addr->sa_family == AF_INET)
 		((struct sockaddr_in *)service->options.send_addr)->sin_port = htons(CHIAKI_DISCOVERY_PORT_PS5);
@@ -161,7 +168,7 @@ static void discovery_service_ping(ChiakiDiscoveryService *service)
 		((struct sockaddr_in6 *)service->options.send_addr)->sin6_port = htons(CHIAKI_DISCOVERY_PORT_PS5);
 	err = chiaki_discovery_send(&service->discovery, &packet, service->options.send_addr, service->options.send_addr_size);
 	if(err != CHIAKI_ERR_SUCCESS)
-		CHIAKI_LOGE(service->log, "Discovery Service failed to send ping for PS5");
+		CHIAKI_LOGE(service->log, "Discovery Service failed to send ping for PS5, error was %s (%d)", chiaki_error_string(err), err);
 }
 
 static void discovery_service_drop_old_hosts(ChiakiDiscoveryService *service)

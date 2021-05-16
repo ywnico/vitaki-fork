@@ -13,6 +13,9 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #endif
+#ifdef __PSVITA__
+#include <malloc.h>
+#endif
 
 CHIAKI_EXPORT const char *chiaki_error_string(ChiakiErrorCode code)
 {
@@ -69,6 +72,8 @@ CHIAKI_EXPORT void *chiaki_aligned_alloc(size_t alignment, size_t size)
 		return r;
 	else
 		return NULL;
+#elif __PSVITA__
+	return memalign(alignment, size);
 #else
 	return aligned_alloc(alignment, size);
 #endif

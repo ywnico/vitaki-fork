@@ -17,6 +17,8 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #define strcasecmp _stricmp
+#elif defined(__PSVITA__)
+#include <netdb.h>
 #else
 #include <unistd.h>
 #include <sys/socket.h>
@@ -593,21 +595,52 @@ static ChiakiErrorCode session_thread_request_session(ChiakiSession *session, Ch
 
 		set_port(sa, htons(SESSION_PORT));
 
-		// TODO: this can block, make cancelable somehow
-		int r = getnameinfo(sa, (socklen_t)ai->ai_addrlen, session->connect_info.hostname, sizeof(session->connect_info.hostname), NULL, 0, NI_NUMERICHOST);
-		if(r != 0)
-		{
-			CHIAKI_LOGE(session->log, "getnameinfo failed with %s, filling the hostname with fallback", gai_strerror(r));
-			memcpy(session->connect_info.hostname, "unknown", 8);
-		}
+		#ifdef __PSVITA__
+			int errno;
+			int rid = sceNetResolverCreate("resolver", NULL, 0);
+			if (rid < 0) {
+				errno = rid & 0xFF;
+				goto vitadns_err;
+			}
+			sockaddr_in* sa_in = (sockaddr_in*) sa;
+			SceNetInAddr addr = { (sa_in->sin_addr).s_addr };
+			int r = sceNetResolverStartAton(
+				rid,
+				&addr,
+				session->connect_info.hostname,
+				sizeof(session->connect_info.hostname),
+				1500,
+				3,
+				0);
+		  if (r < 0) {
+			vitadns_err:
+				CHIAKI_LOGE(session->log, "Failed to resolve hostname, %d", errno);
+				memcpy(session->connect_info.hostname, "unknown", 8);
+			}
+			sceNetResolverDestroy(rid);
+		#else
+			// TODO: this can block, make cancelable somehow
+			int r = getnameinfo(sa, (socklen_t)ai->ai_addrlen, session->connect_info.hostname, sizeof(session->connect_info.hostname), NULL, 0, NI_NUMERICHOST);
+			if(r != 0)
+			{
+				CHIAKI_LOGE(session->log, "getnameinfo failed with %s, filling the hostname with fallback", gai_strerror(r));
+				memcpy(session->connect_info.hostname, "unknown", 8);
+			}
+		#endif
 
 		CHIAKI_LOGI(session->log, "Trying to request session from %s:%d", session->connect_info.hostname, SESSION_PORT);
 
+		#ifdef __PSVITA__
+		session_sock = sceNetSocket("", ai->ai_family, SCE_NET_SOCK_STREAM, 0);
+		#else
 		session_sock = socket(ai->ai_family, SOCK_STREAM, 0);
+		#endif
 		if(CHIAKI_SOCKET_IS_INVALID(session_sock))
 		{
 #ifdef _WIN32
 			CHIAKI_LOGE(session->log, "Failed to create socket to request session");
+#elif defined(__PSVITA__)
+			CHIAKI_LOGE(session->log, "Failed to create socket to request session: 0x%x", session_sock);
 #else
 			CHIAKI_LOGE(session->log, "Failed to create socket to request session: %s", strerror(errno));
 #endif
@@ -716,7 +749,11 @@ static ChiakiErrorCode session_thread_request_session(ChiakiSession *session, Ch
 	CHIAKI_LOGI(session->log, "Sending session request");
 	chiaki_log_hexdump(session->log, CHIAKI_LOG_VERBOSE, (uint8_t *)buf, request_len);
 
+	#ifdef __PSVITA__
+	int sent = sceNetSend(session_sock, buf, request_len, 0);
+	#else
 	int sent = send(session_sock, buf, (size_t)request_len, 0);
+	#endif
 	if(sent < 0)
 	{
 		CHIAKI_LOGE(session->log, "Failed to send session request");

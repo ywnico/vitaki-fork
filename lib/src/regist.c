@@ -286,22 +286,34 @@ static void *regist_thread_func(void *user)
 
 	CHIAKI_LOGI(regist->log, "Regist connected to %s, sending request", regist->info.host);
 
-	int s = send(sock, request_header, request_header_size, 0);
+	#ifdef __PSVITA__
+		int s = sceNetSend(sock, request_header, request_header_size, 0);
+	#else
+		int s = send(sock, request_header, request_header_size, 0);
+	#endif
 	if(s < 0)
 	{
 #ifdef _WIN32
 		CHIAKI_LOGE(regist->log, "Regist failed to send request header: %u", WSAGetLastError());
+#elif defined(__PSVITA__)
+		CHIAKI_LOGE(regist->log, "Regist failed to send request header: 0x%x", errno);
 #else
 		CHIAKI_LOGE(regist->log, "Regist failed to send request header: %s", strerror(errno));
 #endif
 		goto fail_socket;
 	}
 
-	s = send(sock, payload, payload_size, 0);
+	#ifdef __PSVITA__
+		s = sceNetSend(sock, payload, payload_size, 0);
+	#else
+		s = send(sock, payload, payload_size, 0);
+	#endif
 	if(s < 0)
 	{
 #ifdef _WIN32
 		CHIAKI_LOGE(regist->log, "Regist failed to send payload: %u", WSAGetLastError());
+#elif defined(__PSVITA__)
+		CHIAKI_LOGE(regist->log, "Regist failed to send payload: 0x%x", errno);
 #else
 		CHIAKI_LOGE(regist->log, "Regist failed to send payload: %s", strerror(errno));
 #endif
@@ -370,7 +382,11 @@ static ChiakiErrorCode regist_search(ChiakiRegist *regist, struct addrinfo *addr
 	if(regist->info.broadcast)
 		r = sendto_broadcast(regist->log, sock, src, strlen(src) + 1, 0, &send_addr, send_addr_len);
 	else
-		r = send(sock, src, strlen(src) + 1, 0);
+		#ifdef __PSVITA__
+			r = sceNetSend(sock, src, strlen(src) + 1, 0);
+		#else
+			r = send(sock, src, strlen(src) + 1, 0);
+		#endif
 	if(r < 0)
 	{
 		CHIAKI_LOGE(regist->log, "Regist failed to send search: %s", strerror(errno));
@@ -394,7 +410,11 @@ static ChiakiErrorCode regist_search(ChiakiRegist *regist, struct addrinfo *addr
 		}
 
 		uint8_t buf[0x100];
-		int n = recvfrom(sock, buf, sizeof(buf) - 1, 0, recv_addr, recv_addr_size);
+		#ifdef __PSVITA__
+			int n = sceNetRecvfrom(sock, buf, sizeof(buf) - 1, 0, (SceNetSockaddr*) recv_addr, recv_addr_size);
+		#else
+			int n = recvfrom(sock, buf, sizeof(buf) - 1, 0, recv_addr, recv_addr_size);
+		#endif
 		if(n <= 0)
 		{
 			if(n < 0)
@@ -440,7 +460,11 @@ static chiaki_socket_t regist_search_connect(ChiakiRegist *regist, struct addrin
 
 		set_port(send_addr, htons(REGIST_PORT));
 
-		sock = socket(ai->ai_family, SOCK_DGRAM, IPPROTO_UDP);
+		#ifdef __PSVITA__
+		 sock = sceNetSocket("", ai->ai_family, SCE_NET_SOCK_DGRAM, SCE_NET_IPPROTO_UDP);
+		#else
+			sock = socket(ai->ai_family, SOCK_DGRAM, IPPROTO_UDP);
+		#endif
 		if(CHIAKI_SOCKET_IS_INVALID(sock))
 		{
 			CHIAKI_LOGE(regist->log, "Regist failed to create socket for search");
@@ -450,11 +474,17 @@ static chiaki_socket_t regist_search_connect(ChiakiRegist *regist, struct addrin
 		if(regist->info.broadcast)
 		{
 			const int broadcast = 1;
-			int r = setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (const void *)&broadcast, sizeof(broadcast));
+			#ifdef __PSVITA__
+				int r = sceNetSetsockopt(sock, SCE_NET_SOL_SOCKET, SCE_NET_SO_BROADCAST, (const void *)&broadcast, sizeof(broadcast));
+			#else
+				int r = setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (const void *)&broadcast, sizeof(broadcast));
+			#endif
 			if(r < 0)
 			{
 #ifdef _WIN32
 				CHIAKI_LOGE(regist->log, "Regist failed to setsockopt SO_BROADCAST, error %u", WSAGetLastError());
+#elif defined(__PSVITA__)
+				CHIAKI_LOGE(regist->log, "Regist failed to setsockopt SO_BROADCAST, error 0x%x", r);
 #else
 				CHIAKI_LOGE(regist->log, "Regist failed to setsockopt SO_BROADCAST");
 #endif
@@ -473,11 +503,17 @@ static chiaki_socket_t regist_search_connect(ChiakiRegist *regist, struct addrin
 		}
 		else
 		{
+			#ifdef __PSVITA__
+			int r = sceNetConnect(sock, (SceNetSockaddr*) send_addr, *send_addr_len);
+			#else
 			int r = connect(sock, send_addr, *send_addr_len);
+			#endif
 			if(r < 0)
 			{
 #ifdef _WIN32
 				CHIAKI_LOGE(regist->log, "Regist connect failed, error %u", WSAGetLastError());
+#elif defined(__PSVITA__)
+				CHIAKI_LOGE(regist->log, "Regist connect failed, error 0x%x", r);
 #else
 				int errsv = errno;
 				CHIAKI_LOGE(regist->log, "Regist connect failed: %s", strerror(errsv));
@@ -497,19 +533,29 @@ connect_fail:
 
 static chiaki_socket_t regist_request_connect(ChiakiRegist *regist, const struct sockaddr *addr, size_t addr_len)
 {
-	chiaki_socket_t sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	#ifdef __PSVITA__
+		chiaki_socket_t sock = sceNetSocket("", SCE_NET_AF_INET, SCE_NET_SOCK_STREAM, SCE_NET_IPPROTO_TCP);
+	#else
+		chiaki_socket_t sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	#endif
 	if(CHIAKI_SOCKET_IS_INVALID(sock))
 	{
 		return CHIAKI_INVALID_SOCKET;
 	}
 
+	#ifdef __PSVITA__
+	int r = sceNetConnect(sock, (SceNetSockaddr*) addr, addr_len);
+	#else
 	int r = connect(sock, addr, addr_len);
+	#endif
 	if(r < 0)
 	{
-		int errsv = errno;
 #ifdef _WIN32
 		CHIAKI_LOGE(regist->log, "Regist connect failed: %u", WSAGetLastError());
+#elif defined(__PSVITA__)
+		CHIAKI_LOGE(regist->log, "Regist connect failed: 0x%x", r);
 #else
+		int errsv = errno;
 		CHIAKI_LOGE(regist->log, "Regist connect failed: %s", strerror(errsv));
 #endif
 		CHIAKI_SOCKET_CLOSE(sock);
@@ -595,7 +641,11 @@ static ChiakiErrorCode regist_recv_response(ChiakiRegist *regist, ChiakiRegister
 			return err;
 		}
 
+		#ifdef __PSVITA__
+		int received = sceNetRecv(sock, buf + buf_filled_size, (content_size + header_size) - buf_filled_size, 0);
+		#else
 		int received = recv(sock, buf + buf_filled_size, (content_size + header_size) - buf_filled_size, 0);
+		#endif
 		if(received <= 0)
 		{
 			CHIAKI_LOGE(regist->log, "Regist failed to receive response content");

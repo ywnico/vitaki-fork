@@ -7,6 +7,9 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
+#ifdef __PSVITA__
+#include <psp2/kernel/processmgr.h>
+#endif
 
 CHIAKI_EXPORT uint64_t chiaki_time_now_monotonic_us()
 {
@@ -20,6 +23,10 @@ CHIAKI_EXPORT uint64_t chiaki_time_now_monotonic_us()
 	v.QuadPart *= 1000000;
 	v.QuadPart /= f.QuadPart;
 	return v.QuadPart;
+#elif __PSVITA__
+	SceKernelSysClock clk;
+	sceKernelGetProcessTime(&clk);
+	return clk;
 #else
 	struct timespec time;
 	clock_gettime(CLOCK_MONOTONIC, &time);
