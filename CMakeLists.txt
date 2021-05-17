@@ -46,7 +46,7 @@ set(CPACK_DEBIAN_PACKAGE_SECTION "games")
 include(CPack)
 
 set(CHIAKI_IS_SWITCH ${NSWITCH})
-set(CHIAKI_IS_VITA ${VITA})
+set(CHIAKI_IS_VITA ${CHIAKI_ENABLE_VITA})
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_CURRENT_SOURCE_DIR}/setsu/cmake")
 
@@ -180,4 +180,8 @@ endif()
 
 if(CHIAKI_ENABLE_BOREALIS)
 	add_subdirectory(switch)
+endif()
+
+if(CHIAKI_ENABLE_VITA)
+	add_subdirectory(vita)
 endif()
