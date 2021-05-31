@@ -45,7 +45,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_send_buffer_init(ChiakiTakionSendBuf
 	if(err != CHIAKI_ERR_SUCCESS)
 		goto error_packets;
 
-	err = chiaki_cond_init(&send_buffer->cond);
+	err = chiaki_cond_init(&send_buffer->cond, &send_buffer->mutex);
 	if(err != CHIAKI_ERR_SUCCESS)
 		goto error_mutex;
 
@@ -216,9 +216,9 @@ static void *takion_send_buffer_thread_func(void *user)
 	while(true)
 	{
 		if(send_buffer->packets_count) // if there are packets, wait with timeout
-			err = chiaki_cond_timedwait_pred(&send_buffer->cond, &send_buffer->mutex, TAKION_DATA_RESEND_WAKEUP_TIMEOUT_MS, takion_send_buffer_check_pred_packets, send_buffer);
+			err = chiaki_cond_timedwait_pred(&send_buffer->cond, TAKION_DATA_RESEND_WAKEUP_TIMEOUT_MS, takion_send_buffer_check_pred_packets, send_buffer);
 		else // if not, wait without timeout, but also wakeup if packets become available
-			err = chiaki_cond_wait_pred(&send_buffer->cond, &send_buffer->mutex, takion_send_buffer_check_pred_no_packets, send_buffer);
+			err = chiaki_cond_wait_pred(&send_buffer->cond, takion_send_buffer_check_pred_no_packets, send_buffer);
 
 		if(err != CHIAKI_ERR_SUCCESS && err != CHIAKI_ERR_TIMEOUT)
 			break;

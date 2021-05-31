@@ -74,7 +74,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_senkusha_init(ChiakiSenkusha *senkusha, Chi
 	if(err != CHIAKI_ERR_SUCCESS)
 		goto error;
 
-	err = chiaki_cond_init(&senkusha->state_cond);
+	err = chiaki_cond_init(&senkusha->state_cond, &senkusha->state_mutex);
 	if(err != CHIAKI_ERR_SUCCESS)
 		goto error_state_mutex;
 
@@ -160,7 +160,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_senkusha_run(ChiakiSenkusha *senkusha, uint
 		QUIT(quit);
 	}
 
-	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
+	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 	if(!senkusha->state_finished)
 	{
@@ -187,7 +187,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_senkusha_run(ChiakiSenkusha *senkusha, uint
 		QUIT(quit_takion);
 	}
 
-	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
+	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 
 	if(!senkusha->state_finished)
@@ -301,7 +301,7 @@ static ChiakiErrorCode senkusha_run_rtt_test(ChiakiSenkusha *senkusha, uint16_t 
 			return err;
 		}
 
-		err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, EXPECT_PONG_TIMEOUT_MS, state_finished_cond_check, senkusha);
+		err = chiaki_cond_timedwait_pred(&senkusha->state_cond, EXPECT_PONG_TIMEOUT_MS, state_finished_cond_check, senkusha);
 		assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 
 		if(!senkusha->state_finished)
@@ -375,7 +375,7 @@ static ChiakiErrorCode senkusha_run_mtu_in_test(ChiakiSenkusha *senkusha, uint32
 			CHIAKI_LOGI(senkusha->log, "Senkusha MTU request %u (min %u, max %u), id %u, attempt %u",
 					(unsigned int)cur, (unsigned int)min, (unsigned int)max, (unsigned int)request_id, (unsigned int)attempt);
 
-			err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, timeout_ms, state_finished_cond_check, senkusha);
+			err = chiaki_cond_timedwait_pred(&senkusha->state_cond, timeout_ms, state_finished_cond_check, senkusha);
 			assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 
 			if(!senkusha->state_finished)
@@ -438,7 +438,7 @@ static ChiakiErrorCode senkusha_run_mtu_out_test(ChiakiSenkusha *senkusha, uint3
 
 	CHIAKI_LOGI(senkusha->log, "Senkusha sent initial client MTU command");
 
-	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
+	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 
 	if(!senkusha->state_finished)
@@ -512,7 +512,7 @@ static ChiakiErrorCode senkusha_run_mtu_out_test(ChiakiSenkusha *senkusha, uint3
 			}
 			else
 			{
-				err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, timeout_ms, state_finished_cond_check, senkusha);
+				err = chiaki_cond_timedwait_pred(&senkusha->state_cond, timeout_ms, state_finished_cond_check, senkusha);
 			}
 
 			assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
@@ -861,7 +861,7 @@ static ChiakiErrorCode senkusha_send_data_wait_for_ack(ChiakiSenkusha *senkusha,
 		return err;
 	}
 
-	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
+	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 
 	if(!senkusha->state_finished)

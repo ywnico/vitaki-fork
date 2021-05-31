@@ -174,13 +174,14 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_session_init(ChiakiSession *session, Chiaki
 	session->quit_reason = CHIAKI_QUIT_REASON_NONE;
 	session->target = connect_info->ps5 ? CHIAKI_TARGET_PS5_1 : CHIAKI_TARGET_PS4_10;
 
-	ChiakiErrorCode err = chiaki_cond_init(&session->state_cond);
+	ChiakiErrorCode err = chiaki_mutex_init(&session->state_mutex, false);
+	if(err != CHIAKI_ERR_SUCCESS)
+		goto error_state_cond;
+
+	err = chiaki_cond_init(&session->state_cond, &session->state_mutex);
 	if(err != CHIAKI_ERR_SUCCESS)
 		goto error;
 
-	err = chiaki_mutex_init(&session->state_mutex, false);
-	if(err != CHIAKI_ERR_SUCCESS)
-		goto error_state_cond;
 
 	err = chiaki_stop_pipe_init(&session->stop_pipe);
 	if(err != CHIAKI_ERR_SUCCESS)
@@ -400,7 +401,7 @@ static void *session_thread_func(void *arg)
 	chiaki_rpcrypt_init_auth(&session->rpcrypt, session->target, session->nonce, session->connect_info.morning);
 
 	// PS4 doesn't always react right away, sleep a bit
-	chiaki_cond_timedwait_pred(&session->state_cond, &session->state_mutex, 10, session_check_state_pred, session);
+	chiaki_cond_timedwait_pred(&session->state_cond, 10, session_check_state_pred, session);
 
 	CHIAKI_LOGI(session->log, "Starting ctrl");
 
@@ -408,7 +409,7 @@ static void *session_thread_func(void *arg)
 	if(err != CHIAKI_ERR_SUCCESS)
 		QUIT(quit);
 
-	chiaki_cond_timedwait_pred(&session->state_cond, &session->state_mutex, SESSION_EXPECT_TIMEOUT_MS, session_check_state_pred_ctrl_start, session);
+	chiaki_cond_timedwait_pred(&session->state_cond, SESSION_EXPECT_TIMEOUT_MS, session_check_state_pred_ctrl_start, session);
 	CHECK_STOP(quit_ctrl);
 
 	if(session->ctrl_failed)
@@ -431,7 +432,7 @@ static void *session_thread_func(void *arg)
 		chiaki_session_send_event(session, &event);
 		pin_incorrect = true;
 
-		chiaki_cond_timedwait_pred(&session->state_cond, &session->state_mutex, UINT64_MAX, session_check_state_pred_pin, session);
+		chiaki_cond_timedwait_pred(&session->state_cond, UINT64_MAX, session_check_state_pred_pin, session);
 		CHECK_STOP(quit_ctrl);
 		if(session->ctrl_failed)
 		{
@@ -448,7 +449,7 @@ static void *session_thread_func(void *arg)
 		session->login_pin_size = 0;
 
 		// wait for session id again
-		chiaki_cond_timedwait_pred(&session->state_cond, &session->state_mutex, SESSION_EXPECT_TIMEOUT_MS, session_check_state_pred_ctrl_start, session);
+		chiaki_cond_timedwait_pred(&session->state_cond, SESSION_EXPECT_TIMEOUT_MS, session_check_state_pred_ctrl_start, session);
 		CHECK_STOP(quit_ctrl);
 	}
 

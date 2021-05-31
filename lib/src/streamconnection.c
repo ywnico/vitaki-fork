@@ -69,7 +69,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_init(ChiakiStreamConnecti
 	if(err != CHIAKI_ERR_SUCCESS)
 		goto error;
 
-	err = chiaki_cond_init(&stream_connection->state_cond);
+	err = chiaki_cond_init(&stream_connection->state_cond, &stream_connection->state_mutex);
 	if(err != CHIAKI_ERR_SUCCESS)
 		goto error_state_mutex;
 
@@ -192,7 +192,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnectio
 		goto close_takion;
 	}
 
-	err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, &stream_connection->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, stream_connection);
+	err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, EXPECT_TIMEOUT_MS, state_finished_cond_check, stream_connection);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 	CHECK_STOP(close_takion);
 	if(err != CHIAKI_ERR_SUCCESS)
@@ -213,7 +213,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnectio
 		goto disconnect;
 	}
 
-	err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, &stream_connection->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, stream_connection);
+	err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, EXPECT_TIMEOUT_MS, state_finished_cond_check, stream_connection);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 	CHECK_STOP(disconnect);
 
@@ -232,7 +232,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnectio
 	stream_connection->state = STATE_EXPECT_STREAMINFO;
 	stream_connection->state_finished = false;
 	stream_connection->state_failed = false;
-	err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, &stream_connection->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, stream_connection);
+	err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, EXPECT_TIMEOUT_MS, state_finished_cond_check, stream_connection);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 	CHECK_STOP(disconnect);
 
@@ -274,7 +274,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnectio
 
 	while(true)
 	{
-		err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, &stream_connection->state_mutex, HEARTBEAT_INTERVAL_MS, state_finished_cond_check, stream_connection);
+		err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, HEARTBEAT_INTERVAL_MS, state_finished_cond_check, stream_connection);
 		if(err != CHIAKI_ERR_TIMEOUT)
 			break;
 

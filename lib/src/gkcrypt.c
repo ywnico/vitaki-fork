@@ -51,7 +51,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_gkcrypt_init(ChiakiGKCrypt *gkcrypt, Chiaki
 		if(err != CHIAKI_ERR_SUCCESS)
 			goto error_key_buf;
 
-		err = chiaki_cond_init(&gkcrypt->key_buf_cond);
+		err = chiaki_cond_init(&gkcrypt->key_buf_cond, &gkcrypt->key_buf_mutex);
 		if(err != CHIAKI_ERR_SUCCESS)
 			goto error_key_buf_mutex;
 	}
@@ -504,7 +504,7 @@ static void *gkcrypt_thread_func(void *user)
 	assert(err == CHIAKI_ERR_SUCCESS);
 	while(1)
 	{
-		err = chiaki_cond_wait_pred(&gkcrypt->key_buf_cond, &gkcrypt->key_buf_mutex, key_buf_mutex_pred, gkcrypt);
+		err = chiaki_cond_wait_pred(&gkcrypt->key_buf_cond, key_buf_mutex_pred, gkcrypt);
 
 		if(gkcrypt->key_buf_thread_stop || err != CHIAKI_ERR_SUCCESS)
 			break;

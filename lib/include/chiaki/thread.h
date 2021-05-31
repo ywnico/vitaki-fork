@@ -12,8 +12,10 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 
-#ifdef _WIN32
+#if defined(_WIN32)
 #include <windows.h>
+#elif defined(__PSVITA__)
+#include <psp2/kernel/threadmgr.h>
 #else
 #include <pthread.h>
 #endif
@@ -22,10 +24,13 @@ typedef void *(*ChiakiThreadFunc)(void *);
 
 typedef struct chiaki_thread_t
 {
-#ifdef _WIN32
+#if defined(_WIN32)
 	HANDLE thread;
 	ChiakiThreadFunc func;
 	void *arg;
+	void *ret;
+#elif defined(__PSVITA__)
+	SceUID thread_id;
 	void *ret;
 #else
 	pthread_t thread;
@@ -39,8 +44,10 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_thread_set_name(ChiakiThread *thread, const
 
 typedef struct chiaki_mutex_t
 {
-#ifdef _WIN32
+#if defined(_WIN32)
 	CRITICAL_SECTION cs;
+#elif defined(__PSVITA__)
+	SceUID mutex_id;
 #else
 	pthread_mutex_t mutex;
 #endif
@@ -55,8 +62,12 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_mutex_unlock(ChiakiMutex *mutex);
 
 typedef struct chiaki_cond_t
 {
-#ifdef _WIN32
+	ChiakiMutex* mutex;
+#if defined(_WIN32)
 	CONDITION_VARIABLE cond;
+#elif defined(__PSVITA__)
+	SceUID cond_id;
+	unsigned int timeout_us;
 #else
 	pthread_cond_t cond;
 #endif
@@ -64,12 +75,12 @@ typedef struct chiaki_cond_t
 
 typedef bool (*ChiakiCheckPred)(void *);
 
-CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_init(ChiakiCond *cond);
+CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_init(ChiakiCond *cond, ChiakiMutex *mutex);
 CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_fini(ChiakiCond *cond);
-CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_wait(ChiakiCond *cond, ChiakiMutex *mutex);
-CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_timedwait(ChiakiCond *cond, ChiakiMutex *mutex, uint64_t timeout_ms);
-CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_wait_pred(ChiakiCond *cond, ChiakiMutex *mutex, ChiakiCheckPred check_pred, void *check_pred_user);
-CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_timedwait_pred(ChiakiCond *cond, ChiakiMutex *mutex, uint64_t timeout_ms, ChiakiCheckPred check_pred, void *check_pred_user);
+CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_wait(ChiakiCond *cond);
+CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_timedwait(ChiakiCond *cond, uint64_t timeout_ms);
+CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_wait_pred(ChiakiCond *cond, ChiakiCheckPred check_pred, void *check_pred_user);
+CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_timedwait_pred(ChiakiCond *cond, uint64_t timeout_ms, ChiakiCheckPred check_pred, void *check_pred_user);
 CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_signal(ChiakiCond *cond);
 CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_broadcast(ChiakiCond *cond);
 
