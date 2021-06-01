@@ -15,12 +15,16 @@ typedef struct vita_chiaki_host_t {
   VitaChiakiHostType type;
   ChiakiTarget target;
   uint8_t server_mac[6];
-  char host[0x20];
+  char* hostname;
 
   ChiakiDiscoveryHost* discovery_state;
   ChiakiRegisteredHost* registered_state;
 } VitaChiakiHost;
 
+
+typedef uint8_t MacAddr[6];
+
 void host_free(VitaChiakiHost* host);
 int host_register(VitaChiakiHost* host, int pin);
 int host_wakeup(VitaChiakiHost* host);
+bool mac_addrs_match(MacAddr* a, MacAddr* b);

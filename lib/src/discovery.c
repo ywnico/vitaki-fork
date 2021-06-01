@@ -20,7 +20,6 @@
 #endif
 
 #ifdef __PSVITA__
-#include <debugnet.h>
 #define IN6ADDR_ANY_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } } }
 #endif
 
@@ -311,20 +310,15 @@ static void *discovery_thread_func(void *user)
 
 	while(1)
 	{
-		CHIAKI_LOGD(discovery->log, "Discovery selecting with stop pipe");
 		ChiakiErrorCode err = chiaki_stop_pipe_select_single(&thread->stop_pipe, discovery->socket, false, UINT64_MAX);
-		CHIAKI_LOGD(discovery->log, "Discovery selecting with stop pipe done, got 0x%x", err);
 		if(err == CHIAKI_ERR_CANCELED) {
-			CHIAKI_LOGD(discovery->log, "Discovery selecting with stop pipe was canceled");
 			break;
 		}
 		if(err != CHIAKI_ERR_SUCCESS)
 		{
-			CHIAKI_LOGE(discovery->log, "Discovery thread failed to select");
 			break;
 		}
 
-		CHIAKI_LOGD(discovery->log, "Discovery thread is reading from socket");
 		char buf[512];
 		struct sockaddr client_addr;
 		socklen_t client_addr_size = sizeof(client_addr);
@@ -340,7 +334,6 @@ static void *discovery_thread_func(void *user)
 		}
 
 		if(n == 0) {
-			CHIAKI_LOGD(discovery->log, "Got empty response, trying again");
 			continue;
 		}
 

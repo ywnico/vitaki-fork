@@ -9,7 +9,6 @@
 #include <ws2tcpip.h>
 #elif defined(__PSVITA__)
 #include <psp2/net/net.h>
-#include <debugnet.h>
 #else
 #include <unistd.h>
 #include <sys/socket.h>
@@ -57,21 +56,18 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_init(ChiakiStopPipe *stop_pipe)
 	stop_pipe->addr.sin_port = htons(0);
 	int r = sceNetBind(stop_pipe->fd, (SceNetSockaddr *) &stop_pipe->addr, (unsigned int) addr_size);
 	if (r < 0) {
-		debugNetPrintf(DEBUG, "stoppipe: Failed to bind stop pipe fd %d (error was 0x%x).\n", stop_pipe->fd, r);
 		return CHIAKI_ERR_UNKNOWN;
 	}
 	sceNetGetsockname(stop_pipe->fd, (SceNetSockaddr *) &stop_pipe->addr, (unsigned int*) &addr_size);
 	int val = 1;
 	r = sceNetSetsockopt(stop_pipe->fd, SCE_NET_SOL_SOCKET, SCE_NET_SO_NBIO, &val, sizeof(val));
 	if(r < 0) {
-		debugNetPrintf(DEBUG, "stoppipe: Failed to make stop pipe socket %d nonblocking (error was 0x%x).\n", stop_pipe->fd, r);
 		sceNetSocketClose(stop_pipe->fd);
 		return CHIAKI_ERR_UNKNOWN;
 	}
 
 	stop_pipe->epoll_fd = sceNetEpollCreate("chiaki-epoll", 0);
 	if (stop_pipe->epoll_fd < 0) {
-		debugNetPrintf(DEBUG, "stoppipe: Failed to create epoll fd (error was 0x%x).\n", stop_pipe->epoll_fd);
 		return CHIAKI_ERR_UNKNOWN;
 	}
 #else
@@ -113,10 +109,8 @@ CHIAKI_EXPORT void chiaki_stop_pipe_stop(ChiakiStopPipe *stop_pipe)
 	sendto(stop_pipe->fd, "\x00", 1, 0,
 		(struct sockaddr*)&stop_pipe->addr, sizeof(struct sockaddr_in));
 #elif defined(__PSVITA__)
-	debugNetPrintf(DEBUG, "Sending stop signal to stop pipe.\n");
 	int r = sceNetSendto(stop_pipe->fd, "\x00", 1, 0, (SceNetSockaddr*)&stop_pipe->addr, sizeof(stop_pipe->addr));
 	if (r < 0) {
-		debugNetPrintf(DEBUG, "stoppipe: Failed to send stop signal (error was 0x%x).\n", r);
 	}
 #else
 	write(stop_pipe->fds[1], "\x00", 1);
@@ -159,28 +153,22 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_select_single(ChiakiStopPipe *sto
 	SceNetEpollEvent ev = {0};
 	ev.events = SCE_NET_EPOLLIN | SCE_NET_EPOLLHUP;
 	ev.data.fd = stop_pipe->fd;
-	debugNetPrintf(DEBUG, "stoppipe: Adding stop pipe socket %d to epoll control (epoll_fd=%d).\n", stop_pipe->fd, stop_pipe->epoll_fd);
 	int r = sceNetEpollControl(stop_pipe->epoll_fd, SCE_NET_EPOLL_CTL_ADD, stop_pipe->fd, &ev);
 	if (r < 0) {
-		debugNetPrintf(DEBUG, "stoppipe: Oooops during epoll add for stop fd! (error was: 0x%x)\n", r);
 		return CHIAKI_ERR_UNKNOWN;
 	}
 
 	if (!CHIAKI_SOCKET_IS_INVALID(fd)) {
 		ev.events = (write ? SCE_NET_EPOLLOUT : SCE_NET_EPOLLIN) | SCE_NET_EPOLLHUP;
 		ev.data.fd = fd;
-		debugNetPrintf(DEBUG, "stoppipe: Adding socket %d to epoll control (epoll_fd=%d).\n", fd, stop_pipe->epoll_fd);
 		r = sceNetEpollControl(stop_pipe->epoll_fd, SCE_NET_EPOLL_CTL_ADD, fd, &ev);
 		if (r < 0) {
-			debugNetPrintf(DEBUG, "stoppipe: Oooops during epoll add for regular fd! (error was: 0x%x)\n", r);
 			return CHIAKI_ERR_UNKNOWN;
 		}
 	}
 
 	if (r == 0) {
-		debugNetPrintf(DEBUG, "stoppipe: Checking for stop signal for %llums.\n", timeout_ms);
 		r = sceNetEpollWait(stop_pipe->epoll_fd, &ev, 1, timeout_ms * 1000);
-		debugNetPrintf(DEBUG, "stoppipe: Done checking, got an event for, evt=0x%x, fd=0x%x\n", ev.events, ev.data.fd);
 	}
 
 	sceNetEpollControl(stop_pipe->epoll_fd, SCE_NET_EPOLL_CTL_DEL, stop_pipe->fd, NULL);
@@ -189,19 +177,15 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_select_single(ChiakiStopPipe *sto
 	}
 
 	if(r < 0) {
-		debugNetPrintf(DEBUG, "stoppipe: Oooops during epoll wait! (error was: 0x%x)\n", r);
 		return CHIAKI_ERR_UNKNOWN;
 	}
 
 	if (ev.data.fd == stop_pipe->fd) {
-		debugNetPrintf(DEBUG, "stoppipe: Looks like we were canceled!\n");
 		return CHIAKI_ERR_CANCELED;
 	} else if (ev.data.fd == fd) {
-		debugNetPrintf(DEBUG, "stoppipe: Success!\n");
 		return CHIAKI_ERR_SUCCESS;
 	}
 
-	debugNetPrintf(DEBUG, "stoppipe: Timeout (rc was 0x%x, event.data.fd was 0x%x, was waiting for 0x%x or 0x%x)\n", r, ev.data.fd, stop_pipe->fd, fd);
 	return CHIAKI_ERR_TIMEOUT;
 #else
 	fd_set rfds;

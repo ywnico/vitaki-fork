@@ -41,11 +41,16 @@ int64_t get_thread_limit()
 #endif
 
 #ifdef __PSVITA__
+// small buffer to hold thread/mutex/condition var names
 static char name_buffer[256];
+
+// container for function + arguments to be run in a thread
 typedef struct {
    void* arg;
    ChiakiThreadFunc func;
 } sce_thread_args_struct;
+
+// tiny trampoline function to call a one-argument int-returning function
 static int psp_thread_wrap(SceSize args, void *argp) {
    sce_thread_args_struct* sthread_args = (sce_thread_args_struct*)argp;
    return (int)sthread_args->func(sthread_args->arg);

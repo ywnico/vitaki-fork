@@ -1,3 +1,4 @@
+#include <psp2/kernel/processmgr.h>
 #include <debugnet.h>
 
 #include "context.h"

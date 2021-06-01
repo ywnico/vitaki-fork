@@ -3,7 +3,6 @@
 #include <string.h>
 #include <chiaki/discoveryservice.h>
 #include <chiaki/log.h>
-#include <debugnet.h>
 
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -11,26 +10,13 @@
 #include "discovery.h"
 #include "context.h"
 #include "host.h"
-
-typedef uint8_t MacAddr[6];
-
-/// Check if two MAC addresses match
-bool mac_addrs_match(MacAddr* a, MacAddr* b) {
-  for (int j = 0; j < 6; j++) {
-    if (a[j] != b[j]) {
-      return false;
-    }
-  }
-  return true;
-}
+#include "util.h"
 
 /// Save a newly discovered host into the context
 void save_discovered_host(ChiakiDiscoveryHost* host) {
-  uint8_t host_mac[6];
   // Check if the host is already known, and if not, locate a free spot for it
-  sscanf(host->host_id, "%hhx%hhx%hhx%hhx%hhx%hhx", &(host_mac[0]),
-         &(host_mac[1]), &(host_mac[2]), &(host_mac[3]), &(host_mac[4]),
-         &(host_mac[5]));
+  uint8_t host_mac[6];
+  parse_hex(host->host_id, host_mac, sizeof(host_mac));
   int target_idx = -1;
   VitaChiakiHost* h;
   for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
@@ -44,7 +30,7 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
         return;
       }
     } else if (h->type & MANUALLY_ADDED) {
-      if (strcmp(h->host, host->host_addr)) {
+      if (strcmp(h->hostname, host->host_addr)) {
         // Manually added host matched this discovered host, update
         target_idx = host_idx;
         break;
@@ -64,16 +50,16 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
 
   h->type |= DISCOVERED;
   h->target = chiaki_discovery_host_system_version_target(host);
+  memcpy(&(h->server_mac), &host_mac, 6);
   h->discovery_state =
       (ChiakiDiscoveryHost*)malloc(sizeof(ChiakiDiscoveryHost));
-  memcpy(&(h->server_mac), &host_mac, 6);
-  strcpy(h->host, h->discovery_state->host_addr);
   memcpy(h->discovery_state, host, sizeof(ChiakiDiscoveryHost));
+  h->hostname = (char*) h->discovery_state->host_addr;
   context.hosts[target_idx] = h;
   context.num_hosts++;
 
   // Check if the newly discovered host is a known registered one
-  for (int rhost_idx = 0; rhost_idx < MAX_NUM_HOSTS; rhost_idx++) {
+  for (int rhost_idx = 0; rhost_idx < context.config.num_registered_hosts; rhost_idx++) {
     ChiakiRegisteredHost* rhost =
         context.config.registered_hosts[rhost_idx]->registered_state;
     if (rhost == NULL) {
@@ -88,15 +74,14 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
 
 /// Called whenever new hosts are discovered
 void discovery_cb(ChiakiDiscoveryHost* hosts, size_t hosts_count, void* user) {
-  debugNetPrintf(DEBUG, "Got discovery results, found %d hosts.\n", hosts_count);
   for (int dhost_idx = 0; dhost_idx < hosts_count; dhost_idx++) {
-    save_discovered_host(hosts + dhost_idx);
+    save_discovered_host(&hosts[dhost_idx]);
   }
 
   // Call caller-defined callback
   VitaChiakiDiscoveryCallbackState* cb_state =
       (VitaChiakiDiscoveryCallbackState*)user;
-  if (cb_state != NULL && cb_state->cb != NULL) {
+  if (cb_state && cb_state->cb) {
     cb_state->cb(cb_state->cb_user);
   }
 }
@@ -112,7 +97,6 @@ ChiakiErrorCode start_discovery(VitaChiakiDiscoveryCb cb, void* cb_user) {
     context.discovery_cb_state->cb = cb;
     context.discovery_cb_state->cb_user = cb_user;
   }
-  debugNetPrintf(DEBUG, "Setting up discovery options\n");
   ChiakiDiscoveryServiceOptions opts;
   opts.cb = discovery_cb;
   opts.cb_user = context.discovery_cb_state;
@@ -125,10 +109,8 @@ ChiakiErrorCode start_discovery(VitaChiakiDiscoveryCb cb, void* cb_user) {
   opts.send_addr = (struct sockaddr*) &addr;
   opts.send_addr_size = sizeof(addr);
 
-  debugNetPrintf(DEBUG, "Initializing chiaki discovery service\n");
   ChiakiErrorCode err = chiaki_discovery_service_init(&(context.discovery),
                                                       &opts, &(context.log));
-  debugNetPrintf(DEBUG, "Result of discovery service initialization: %d\n", err);
   context.discovery_enabled = true;
   return err;
 }
@@ -138,7 +120,6 @@ void stop_discovery() {
   if (!context.discovery_enabled) {
     return;
   }
-  debugNetPrintf(DEBUG, "Stopping chiaki discovery service.\n");
   chiaki_discovery_service_fini(&(context.discovery));
   context.discovery_enabled = false;
   for (int i = 0; i < MAX_NUM_HOSTS; i++) {

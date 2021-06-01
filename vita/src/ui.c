@@ -1,4 +1,5 @@
 // Very very simple homegrown immediate mode GUI
+#include <sys/param.h>
 #include <stdio.h>
 #include <string.h>
 #include <vita2d.h>
@@ -9,9 +10,6 @@
 #include "host.h"
 #include "ui.h"
 
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
-
 #define COLOR_WHITE RGBA8(255, 255, 255, 255)
 #define COLOR_ACTIVE RGBA8(255, 170, 238, 255)
 #define COLOR_TILE_BG RGBA8(51, 51, 51, 255)
@@ -21,7 +19,7 @@
 #define HEADER_BAR_Y 45
 #define HEADER_BAR_H 26
 #define HEADER_BAR_W 774
-#define HOST_SLOTS_X HEADER_BAR_X
+#define HOST_SLOTS_X HEADER_BAR_X - 86
 #define HOST_SLOTS_Y HEADER_BAR_Y + HEADER_BAR_H + 45
 #define HOST_SLOT_W 400
 #define HOST_SLOT_H 200
@@ -150,19 +148,19 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
     vita2d_draw_texture(img_discovery_host, x, y);
     vita2d_pvf_draw_text(font, x + 68, y + 23, COLOR_WHITE, 1.0f,
                          host->discovery_state->host_name);
-    vita2d_pvf_draw_text(font, x + 270, y + 10, COLOR_WHITE, 1.0f,
+    vita2d_pvf_draw_text(font, x + 260, y + 23, COLOR_WHITE, 1.0f,
                          host->discovery_state->host_id);
   } else if (registered) {
     uint8_t* host_mac = host->registered_state->server_mac;
     vita2d_pvf_draw_textf(font, x + 68, y + 23, COLOR_WHITE, 1.0f,
                           "%X%X%X%X%X%X", host_mac[0], host_mac[1], host_mac[2],
                           host_mac[3], host_mac[4], host_mac[5]);
-    vita2d_pvf_draw_text(font, x + 270, y + 10, COLOR_WHITE, 1.0f,
+    vita2d_pvf_draw_text(font, x + 260, y + 23, COLOR_WHITE, 1.0f,
                          host->discovery_state->host_id);
   }
 
   // Draw host address
-  vita2d_pvf_draw_text(font, x + 290, y + 34, COLOR_WHITE, 1.0f, host->host);
+  vita2d_pvf_draw_text(font, x + 260, y + 44, COLOR_WHITE, 1.0f, host->hostname);
 
   vita2d_texture* console_img;
   bool is_ps5 = chiaki_target_is_ps5(host->target);

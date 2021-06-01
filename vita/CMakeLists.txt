@@ -2,8 +2,8 @@ include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
 
 set(VITA_APP_NAME "chiaki")
 set(VITA_TITLEID  "CHIAKI001")
-# More than two dots and the VPK won't install, so add the patch version without a dot
-set(VITA_VERSION "${CHIAKI_VERSION_MAJOR}.${CHIAKI_VERSION_MINOR}${CHIAKI_VERSION_PATCH}")
+# TODO: Make it dynamic
+set(VITA_VERSION "00.01")
 
 add_executable(${VITA_APP_NAME}.elf
     src/config.c
@@ -11,7 +11,10 @@ add_executable(${VITA_APP_NAME}.elf
     src/discovery.c
     src/main.c
     src/ui.c
+    src/util.c
+    src/host.c
 
+    third_party/tomlc99/toml.c
     # src/lib/ime.c
 )
 
@@ -22,15 +25,26 @@ target_compile_definitions(${VITA_APP_NAME}.elf PUBLIC
 
 target_include_directories(${VITA_APP_NAME}.elf PRIVATE
     include
+    third_party
 )
-
 
 target_link_libraries(${VITA_APP_NAME}.elf
   # TODO: Do we really need all of those?
   chiaki-lib
+  vita2d
+  debugnet
   ssl
   crypto
   opus
+
+  freetype
+  png
+  jpeg
+  z
+  m
+  c
+  pthread
+  zip
 
   SceDisplay_stub
   SceGxm_stub
@@ -50,17 +64,6 @@ target_link_libraries(${VITA_APP_NAME}.elf
   SceIme_stub
   SceSsl_stub
 
-  vita2d
-  freetype
-  png
-  jpeg
-  z
-  m
-  c
-
-  debugnet
-  pthread
-  zip
 )
 
 
@@ -71,10 +74,10 @@ if(CHIAKI_IS_VITA)
         VERSION ${VITA_VERSION}
         NAME ${VITA_APP_NAME}
         # Livearea stuff
-        FILE res/icon0.png sce_sys/icon0.png
-        FILE res/livearea/contents/bg.png sce_sys/livearea/contents/bg.png
-        FILE res/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
-        FILE res/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
+        #FILE res/icon0.png sce_sys/icon0.png
+        #FILE res/livearea/contents/bg.png sce_sys/livearea/contents/bg.png
+        #FILE res/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
+        #FILE res/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
         # Textures, other assets
         FILE res/assets/btn_add_active.png assets/btn_add_active.png
         FILE res/assets/btn_add.png assets/btn_add.png

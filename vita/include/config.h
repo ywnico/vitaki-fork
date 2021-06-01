@@ -15,6 +15,7 @@ typedef enum vita_chiaki_disconnect_action_t {
 
 /// Settings for the app
 typedef struct vita_chiaki_config_t {
+  int cfg_version;
   // We use a global PSN Account ID so users only have to enter it once
   char* psn_account_id;
   /// Whether discovery is enabled by default
@@ -22,12 +23,14 @@ typedef struct vita_chiaki_config_t {
   VitaChiakiDisconnectAction disconnect_action;
   ChiakiVideoResolutionPreset resolution;
   ChiakiVideoFPSPreset fps;
+  size_t num_manual_hosts;
   VitaChiakiHost* manual_hosts[MAX_NUM_HOSTS];
+  size_t num_registered_hosts;
   VitaChiakiHost* registered_hosts[MAX_NUM_HOSTS];
   // TODO: Logfile path
   // TODO: Loglevel
 } VitaChiakiConfig;
 
-void config_parse(char* filename, VitaChiakiConfig* cfg);
+VitaChiakiConfig* config_parse(char* filename);
 void config_free(VitaChiakiConfig* cfg);
 void config_serialize(char* filename, VitaChiakiConfig* cfg);

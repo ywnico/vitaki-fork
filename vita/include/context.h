@@ -6,6 +6,9 @@
 #include "discovery.h"
 #include "host.h"
 #include "ui.h"
+#include "debugnet.h"
+
+#define LOGD(fmt, ...) debugNetPrintf(DEBUG, fmt"\n", __VA_ARGS__)
 
 typedef struct vita_chiaki_context_t {
   ChiakiLog log;

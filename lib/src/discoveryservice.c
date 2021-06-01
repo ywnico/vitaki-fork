@@ -2,8 +2,10 @@
 
 #include <chiaki/discoveryservice.h>
 
+#include <inttypes.h>
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
 
 #ifdef _WIN32
 #include <ws2tcpip.h>
@@ -82,11 +84,8 @@ error_hosts:
 
 CHIAKI_EXPORT void chiaki_discovery_service_fini(ChiakiDiscoveryService *service)
 {
-	CHIAKI_LOGD(service->log, "Triggering stop condition.");
 	chiaki_bool_pred_cond_signal(&service->stop_cond);
-	CHIAKI_LOGD(service->log, "Joining discovery thread");
 	chiaki_thread_join(&service->thread, NULL);
-	CHIAKI_LOGD(service->log, "Cleaning up memory");
 	chiaki_bool_pred_cond_fini(&service->stop_cond);
 	chiaki_discovery_fini(&service->discovery);
 	chiaki_mutex_fini(&service->state_mutex);
@@ -114,20 +113,19 @@ static void *discovery_service_thread_func(void *user)
 
 	ChiakiDiscoveryThread discovery_thread;
 	err = chiaki_discovery_thread_start(&discovery_thread, &service->discovery, discovery_service_host_received, service);
-	if(err != CHIAKI_ERR_SUCCESS)
+	if(err != CHIAKI_ERR_SUCCESS) {
 		goto beach;
+	}
 
 	while(true)
 	{
 		err = chiaki_bool_pred_cond_timedwait(&service->stop_cond, service->options.ping_ms);
 		if(err != CHIAKI_ERR_TIMEOUT) {
-			CHIAKI_LOGD(service->log, "Timeout while pinging.");
 			break;
 		}
 		discovery_service_ping(service);
 	}
 
-	CHIAKI_LOGD(service->log, "Stopping discovery thread.");
 	chiaki_discovery_thread_stop(&discovery_thread);
 
 beach:
