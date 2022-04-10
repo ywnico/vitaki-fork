@@ -4,7 +4,6 @@
 #include <string.h>
 #include <vita2d.h>
 #include <psp2/ctrl.h>
-#include <debugnet.h>
 
 #include "context.h"
 #include "host.h"
@@ -45,7 +44,7 @@
 #define IMG_DISCOVERY_HOST TEXTURE_PATH "discovered_host.png"
 #define IMG_HEADER_LOGO_PATH TEXTURE_PATH "header_logo.png"
 
-vita2d_pvf* font;
+vita2d_font* font;
 vita2d_texture *btn_register, *btn_register_active, *btn_add, *btn_add_active,
     *btn_discovery, *btn_discovery_active, *btn_discovery_off,
     *btn_discovery_off_active, *btn_settings, *btn_settings_active, *img_ps4,
@@ -146,24 +145,25 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
   // Draw host name and host id
   if (discovered) {
     vita2d_draw_texture(img_discovery_host, x, y);
-    vita2d_pvf_draw_text(font, x + 68, y + 23, COLOR_WHITE, 1.0f,
+    vita2d_font_draw_text(font, x + 68, y + 40, COLOR_WHITE, 40,
                          host->discovery_state->host_name);
-    vita2d_pvf_draw_text(font, x + 260, y + 23, COLOR_WHITE, 1.0f,
+    vita2d_font_draw_text(font, x + 255, y + 23, COLOR_WHITE, 20,
                          host->discovery_state->host_id);
   } else if (registered) {
     uint8_t* host_mac = host->registered_state->server_mac;
-    vita2d_pvf_draw_textf(font, x + 68, y + 23, COLOR_WHITE, 1.0f,
+    vita2d_font_draw_textf(font, x + 68, y + 40, COLOR_WHITE, 32,
                           "%X%X%X%X%X%X", host_mac[0], host_mac[1], host_mac[2],
                           host_mac[3], host_mac[4], host_mac[5]);
-    vita2d_pvf_draw_text(font, x + 260, y + 23, COLOR_WHITE, 1.0f,
+    vita2d_font_draw_text(font, x + 255, y + 23, COLOR_WHITE, 20,
                          host->discovery_state->host_id);
   }
 
   // Draw host address
-  vita2d_pvf_draw_text(font, x + 260, y + 44, COLOR_WHITE, 1.0f, host->hostname);
+  vita2d_font_draw_text(font, x + 260, y + 44, COLOR_WHITE, 20, host->hostname);
 
   vita2d_texture* console_img;
   bool is_ps5 = chiaki_target_is_ps5(host->target);
+  // TODO: Don't use separate textures for off/on/rest, use tinting instead
   if (added && !discovered) {
     console_img = is_ps5 ? img_ps5_off : img_ps4_off;
   } else if (at_rest) {
@@ -176,8 +176,8 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
     const char* app_name = host->discovery_state->running_app_name;
     const char* app_id = host->discovery_state->running_app_titleid;
     if (app_name && app_id) {
-      vita2d_pvf_draw_text(font, x + 32, y + 16, COLOR_WHITE, 1.0f, app_name);
-      vita2d_pvf_draw_text(font, x + 300, y + 170, COLOR_WHITE, 1.0f, app_id);
+      vita2d_font_draw_text(font, x + 32, y + 16, COLOR_WHITE, 16, app_name);
+      vita2d_font_draw_text(font, x + 300, y + 170, COLOR_WHITE, 16, app_id);
     }
   }
 
@@ -397,13 +397,14 @@ void draw_ui() {
 
   UIScreenType screen = UI_SCREEN_TYPE_MAIN;
   load_textures();
-  font = vita2d_load_default_pvf();
+  font = vita2d_load_font_file("app0:/assets/fonts/Roboto-Regular.ttf");
 
+  vita2d_set_vblank_wait(true);
   while (true) {
     // Get current controller state
     if (!sceCtrlReadBufferPositive(0, &ctrl, 1)) {
       // Try again...
-      debugNetPrintf(ERROR, "Failed to get controller state\n");
+      LOGE("Failed to get controller state");
       continue;
     }
     context.ui_state.old_button_state = context.ui_state.button_state;

@@ -23,7 +23,8 @@ void log_cb_debugnet(ChiakiLogLevel lvl, const char *msg, void *user) {
     default:
       return;
   }
-  debugNetPrintf(debugnet_lvl, "[CHIAKI] %s\n", msg);
+  uint64_t timestamp = sceKernelGetProcessTimeWide();
+  debugNetPrintf(debugnet_lvl, "[CHIAKI] %ju %s\n", timestamp, msg);
 }
 
 bool vita_chiaki_init_context() {

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import re
 import socket
 import sys
 import tempfile
@@ -16,9 +17,18 @@ from parse_core.elf import ElfParser
 from parse_core.util import u32
 from parse_core import main as pcore
 
-COLOR_RED = '\x1b[6;30;31m'
+COLOR_RED = '\x1b[31;1m'
+COLOR_BLUE = '\x1b[34;1m'
 COLOR_END = '\x1b[0m'
 
+LOG_LEVEL_COLORS = {
+    'DEBUG': '',
+    'INFO': COLOR_BLUE,
+    'ERROR': COLOR_RED,
+}
+
+LOG_LINE_PAT = re.compile(
+    r'^\[(?P<level>[A-Z]+?)\]: (?P<is_chiaki>\[CHIAKI\] )?(?P<timestamp>\d+) (?P<msg>.+)$')
 
 def fetch_latest_coredump(hostname: str) -> Optional[Path]:
     ftp = FTP()
@@ -129,7 +139,18 @@ def tail_logs(host: str) -> None:
     while True:
         try:
             logline = fp.readline().replace('[VITA]', '')
-            print(logline, end="")
+            match = LOG_LINE_PAT.match(logline)
+            if match is None:
+                continue
+            timestamp = int(match.group('timestamp')) / 1e6
+            is_chiaki = match.group('is_chiaki') is not None
+            msg = match.group('msg')
+            level = match.group('level')
+            color = LOG_LEVEL_COLORS[level]
+            if is_chiaki:
+                level = f'CHIAKI-{level}'
+            level = f'[{level}]'
+            print(f'{color}{timestamp:>8.4f} {level:<16} {msg}{COLOR_END}')
         except KeyboardInterrupt:
             return
 

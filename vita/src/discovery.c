@@ -46,6 +46,8 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
 
   if (!h) {
     h = (VitaChiakiHost*)malloc(sizeof(VitaChiakiHost));
+    h->registered_state = NULL;
+    h->hostname = NULL;
   }
 
   h->type |= DISCOVERED;
@@ -54,7 +56,7 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
   h->discovery_state =
       (ChiakiDiscoveryHost*)malloc(sizeof(ChiakiDiscoveryHost));
   memcpy(h->discovery_state, host, sizeof(ChiakiDiscoveryHost));
-  h->hostname = (char*) h->discovery_state->host_addr;
+  h->hostname = strdup(h->discovery_state->host_addr);
   context.hosts[target_idx] = h;
   context.num_hosts++;
 
@@ -128,11 +130,7 @@ void stop_discovery() {
       continue;
     }
     if (!(h->type & MANUALLY_ADDED)) {
-      // Discovered host, can be completely freed
-      free(h->discovery_state);
-      if (h->registered_state) {
-        free(h->registered_state);
-      }
+      host_free(h);
       context.hosts[i] = NULL;
       context.num_hosts--;
     } else if (h->type & DISCOVERED) {

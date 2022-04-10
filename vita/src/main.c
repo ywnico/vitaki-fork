@@ -89,15 +89,15 @@ int main(int argc, char* argv[]) {
 
   vita_chiaki_init_context();
   if (context.config.auto_discovery) {
-    debugNetPrintf(DEBUG, "Starting discovery\n");
+    LOGD("Starting discovery");
     ChiakiErrorCode err = start_discovery(NULL, NULL);
     if (err != CHIAKI_ERR_SUCCESS) {
-      debugNetPrintf(DEBUG, "Failed to start discovery: %d\n", err);
+      LOGD("Failed to start discovery: %d\n", err);
       sceKernelExitProcess(err);
     }
   }
 
-  debugNetPrintf(DEBUG, "Starting to draw UI\n");
+  LOGD("Starting to draw UI");
   draw_ui();
 
   // TODO: Cleanup

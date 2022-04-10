@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -xveo pipefail
+set -veo pipefail
 
 SCRIPTDIR=$(dirname "$0")
 BASEDIR=$(realpath "${SCRIPTDIR}/../../")

@@ -112,6 +112,7 @@ VitaChiakiConfig* config_parse(char* filename) {
     for (int i=0; i < MIN(MAX_NUM_HOSTS, num_rhosts) ; i++) {
       VitaChiakiHost* host = malloc(sizeof(VitaChiakiHost));
       ChiakiRegisteredHost* rstate = malloc(sizeof(ChiakiRegisteredHost));
+      LOGD("Assigning registered state: 0x%x", rstate);
       host->registered_state = rstate;
       toml_table_t* host_cfg = toml_table_at(regist_hosts, i);
       datum = toml_string_in(host_cfg, "server_mac");

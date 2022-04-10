@@ -97,5 +97,6 @@ if(CHIAKI_IS_VITA)
         FILE res/assets/ps5_off.png assets/ps5_off.png
         FILE res/assets/ps5.png assets/ps5.png
         FILE res/assets/ps5_rest.png assets/ps5_rest.png
+        FILE res/assets/fonts/Roboto-Regular.ttf assets/fonts/Roboto-Regular.ttf
     )
 endif()
