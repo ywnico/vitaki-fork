@@ -3,10 +3,10 @@ from elftools.elf.elffile import ELFFile
 from collections import defaultdict
 from argparse import ArgumentParser
 
-from .util import u16, u32, c_str, hexdump
-from .indent import indent, iprint
-from .elf import ElfParser
-from .core import CoreParser
+from util import u16, u32, c_str, hexdump
+from indent import indent, iprint
+from elf import ElfParser
+from core import CoreParser
 
 str_stop_reason = defaultdict(str, {
     0: "No reason",

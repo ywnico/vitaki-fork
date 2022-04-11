@@ -5,8 +5,8 @@ from elftools.elf.elffile import ELFFile
 from sys import argv
 from collections import defaultdict
 
-from .util import u16, u32, c_str, hexdump
-from .indent import indent, iprint
+from util import u16, u32, c_str, hexdump
+from indent import indent, iprint
 
 
 class VitaThread():
@@ -79,7 +79,7 @@ class VitaAddress():
             state = "Thumb"
             addr_to_display &= ~1
 
-        if self.is_located() and self.__module.name.endswith(".elf"):
+        if self.is_located():
             iprint()
             iprint("DISASSEMBLY AROUND {}: 0x{:x} ({}):".format(self.__symbol, addr_to_display, state))
             elf.disas_around_addr(self.__offset)

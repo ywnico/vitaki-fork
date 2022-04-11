@@ -1,7 +1,9 @@
 #include "context.h"
 #include "host.h"
 
-void host_init(VitaChiakiHost* host) 
+void host_init(VitaChiakiHost* host) {
+  
+}
 
 void host_free(VitaChiakiHost* host) {
   if (host->discovery_state) {

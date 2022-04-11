@@ -7,7 +7,7 @@ BASEDIR=$(realpath "${SCRIPTDIR}/../../")
 
 build_chiaki (){
 	pushd "${BASEDIR}"
-	if [[ ! -d './build' ]]; then
+	# if [[ ! -d './build' ]]; then
 		cmake -B "./build" \
 			-DCMAKE_BUILD_TYPE=Debug \
 			-DCMAKE_TOOLCHAIN_FILE=${VITASDK}/share/vita.toolchain.cmake \
@@ -22,8 +22,9 @@ build_chiaki (){
 			-DCHIAKI_ENABLE_PI_DECODER=OFF \
 			-DCHIAKI_USE_SYSTEM_NANOPB=OFF \
 			-DCHIAKI_LIB_ENABLE_OPUS=OFF
-	fi
-	make -C "./build"
+	# fi
+	make -j$(nproc) -C "./build"
+	python3 ./scripts/vita/devtool.py --upload-assets --host $PSVITAIP upload
 	popd
 }
 
