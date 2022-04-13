@@ -21,6 +21,7 @@
 #include <openssl/rand.h>
 #include <psp2/ctrl.h>
 #include <psp2/io/stat.h>
+#include <psp2/kernel/modulemgr.h>
 #include <psp2/kernel/rng.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/kernel/processmgr.h>
@@ -65,7 +66,7 @@ static void vita_init() {
 }
 
 int main(int argc, char* argv[]) {
-  debugNetInit("192.168.2.49", 31338, DEBUG);
+  debugNetInit("192.168.1.240", 31338, DEBUG);
   vita_init();
 
   // TODO: initialize power control thread

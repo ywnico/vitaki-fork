@@ -25,7 +25,7 @@ def u32(buf, off):
 def c_str(buf, off):
     out = ""
     while off < len(buf) and buf[off] != '\0':
-        out += buf[off]
+        out += chr(buf[off])
         off += 1
     return out
 

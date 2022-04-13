@@ -10,7 +10,9 @@ from pathlib import Path
 from ftplib import FTP, error_perm, error_reply
 from typing import Optional
 
+path_root = Path(__file__).parents[0]
 sys.path.insert(0, ".")
+sys.path.insert(0, str(path_root) + "/parse_core")
 
 from parse_core.core import CoreParser
 from parse_core.elf import ElfParser

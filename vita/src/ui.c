@@ -127,7 +127,7 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
   bool discovered = host->type & DISCOVERED;
   bool registered = host->type & REGISTERED;
   bool added = host->type & MANUALLY_ADDED;
-  bool mutable = (added || registered);
+  bool mutable = true;//(added || registered);
   bool at_rest = discovered && host->discovery_state->state ==
                                    CHIAKI_DISCOVERY_HOST_STATE_STANDBY;
 
@@ -165,16 +165,18 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
   bool is_ps5 = chiaki_target_is_ps5(host->target);
   // TODO: Don't use separate textures for off/on/rest, use tinting instead
   if (added && !discovered) {
-    console_img = is_ps5 ? img_ps5_off : img_ps4_off;
+    console_img = is_ps5 ? img_ps5 : img_ps4;
   } else if (at_rest) {
     console_img = is_ps5 ? img_ps5_rest : img_ps4_rest;
   } else {
-    console_img = is_ps5 ? img_ps5_off : img_ps4_off;
+    console_img = is_ps5 ? img_ps5 : img_ps4;
   }
   vita2d_draw_texture(console_img, x + 64, y + 64);
   if (discovered && !at_rest) {
     const char* app_name = host->discovery_state->running_app_name;
     const char* app_id = host->discovery_state->running_app_titleid;
+    // printf("%s", app_name);
+    // printf("%s", app_id);
     if (app_name && app_id) {
       vita2d_font_draw_text(font, x + 32, y + 16, COLOR_WHITE, 16, app_name);
       vita2d_font_draw_text(font, x + 300, y + 170, COLOR_WHITE, 16, app_id);
@@ -377,29 +379,38 @@ bool draw_registration_dialog() { return false; }
 
 /// Draw the form to manually add a new host
 /// @return whether the dialog should keep rendering
-bool draw_add_host_dialog() { return false; }
+bool draw_add_host_dialog() { 
+
+
+  return false; 
+}
 
 /// Draw the form to edit an existing host
 /// @return whether the dialog should keep rendering
-bool draw_edit_host_dialog() { return false; }
+bool draw_edit_host_dialog() { 
 
+  return false;
+}
 /// Render the current frame of an active stream
 /// @return whether the stream should keep rendering
 bool draw_stream() { return false; }
 
-/// Main UI loop
-void draw_ui() {
+void init_ui() {
   vita2d_init();
   vita2d_set_clear_color(RGBA8(0x40, 0x40, 0x40, 0xFF));
+  load_textures();
+  font = vita2d_load_font_file("app0:/assets/fonts/Roboto-Regular.ttf");
+  vita2d_set_vblank_wait(true);
+}
 
+/// Main UI loop
+void draw_ui() {
+  init_ui();
   SceCtrlData ctrl;
   memset(&ctrl, 0, sizeof(ctrl));
 
   UIScreenType screen = UI_SCREEN_TYPE_MAIN;
-  load_textures();
-  font = vita2d_load_font_file("app0:/assets/fonts/Roboto-Regular.ttf");
 
-  vita2d_set_vblank_wait(true);
   while (true) {
     // Get current controller state
     if (!sceCtrlReadBufferPositive(0, &ctrl, 1)) {

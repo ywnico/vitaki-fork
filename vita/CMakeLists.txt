@@ -63,21 +63,20 @@ target_link_libraries(${VITA_APP_NAME}.elf
   SceAudio_stub
   SceIme_stub
   SceSsl_stub
-
 )
 
 
 if(CHIAKI_IS_VITA)
-    vita_create_self(${VITA_APP_NAME}.self ${VITA_APP_NAME}.elf)
+    vita_create_self(${VITA_APP_NAME}.self ${VITA_APP_NAME}.elf UNSAFE)
 
     vita_create_vpk(${VITA_APP_NAME}.vpk ${VITA_TITLEID} ${VITA_APP_NAME}.self
         VERSION ${VITA_VERSION}
         NAME ${VITA_APP_NAME}
         # Livearea stuff
-        #FILE res/icon0.png sce_sys/icon0.png
-        #FILE res/livearea/contents/bg.png sce_sys/livearea/contents/bg.png
-        #FILE res/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
-        #FILE res/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
+        FILE res/icon0.png sce_sys/icon0.png
+        FILE res/livearea/contents/bg.png sce_sys/livearea/contents/bg.png
+        FILE res/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
+        FILE res/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
         # Textures, other assets
         FILE res/assets/btn_add_active.png assets/btn_add_active.png
         FILE res/assets/btn_add.png assets/btn_add.png
