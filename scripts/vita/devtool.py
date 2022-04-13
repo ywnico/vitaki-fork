@@ -94,14 +94,14 @@ def _vitacompanion_send_cmd(hostname: str, cmd: str) -> None:
 
 def run_app(hostname: str) -> None:
     _vitacompanion_send_cmd(hostname, 'destroy')
-    time.sleep(1)
+    time.sleep(0.2)
     _vitacompanion_send_cmd(hostname, 'launch CHIAKI001')
 
 
 def upload_app(hostname: str, with_assets: bool) -> None:
     # Can't overwrite running app, must kill it first
     _vitacompanion_send_cmd(hostname, 'destroy')
-    time.sleep(1)
+    time.sleep(0.2)
     vpk_path = Path(__file__).parent / '../../build/vita/chiaki.vpk'
     if not vpk_path.exists():
         print(COLOR_RED + "No Vita build found, please run the build script first." + COLOR_END)

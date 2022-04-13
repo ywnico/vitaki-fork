@@ -10,6 +10,7 @@
 #include "ui.h"
 
 #define COLOR_WHITE RGBA8(255, 255, 255, 255)
+#define COLOR_BLACK RGBA8(0, 0, 0, 255)
 #define COLOR_ACTIVE RGBA8(255, 170, 238, 255)
 #define COLOR_TILE_BG RGBA8(51, 51, 51, 255)
 #define COLOR_BANNER RGBA8(22, 45, 80, 255)
@@ -280,8 +281,11 @@ bool header_button(MainWidgetId id, int x_offset, vita2d_texture* default_img,
   return is_active && btn_pressed(SCE_CTRL_CROSS);
 }
 
-void text_input(int x, int y, int w, int h, char* label, vita2d_texture* icon,
+void text_input(int x, int y, int w, int h, char* label,
                 char* value, int max_len) {
+  vita2d_draw_rectangle(x, y, w, h, COLOR_BLACK);
+  // vita2d_draw_texture(icon, x + 20, y + h / 2);
+  vita2d_font_draw_text(font, x + 20, y + h / 1.5, COLOR_WHITE, 40, value);
   // TODO: Render label + icon
   // TODO: Render input border
   // TODO: Render value
@@ -373,6 +377,14 @@ UIScreenType draw_main_menu() {
   return next_screen;
 }
 
+/// Draw the settings form
+/// @return whether the dialog should keep rendering
+bool draw_settings() {
+  char* val = "val";
+  text_input(300, 300, 600, 80, val, val, 30);
+  return true;
+}
+
 /// Draw the form to register a host
 /// @return whether the dialog should keep rendering
 bool draw_registration_dialog() { return false; }
@@ -450,6 +462,10 @@ void draw_ui() {
       }
     } else if (screen == UI_SCREEN_TYPE_STREAM) {
       if (!draw_stream()) {
+        screen = UI_SCREEN_TYPE_MAIN;
+      }
+    } else if (screen == UI_SCREEN_TYPE_SETTINGS) {
+      if (!draw_settings()) {
         screen = UI_SCREEN_TYPE_MAIN;
       }
     }
