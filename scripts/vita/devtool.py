@@ -9,6 +9,7 @@ import zipfile
 from pathlib import Path
 from ftplib import FTP, error_perm, error_reply
 from typing import Optional
+from collections import defaultdict
 
 path_root = Path(__file__).parents[0]
 sys.path.insert(0, ".")
@@ -16,8 +17,9 @@ sys.path.insert(0, str(path_root) + "/parse_core")
 
 from parse_core.core import CoreParser
 from parse_core.elf import ElfParser
-from parse_core.util import u32
-from parse_core import main as pcore
+from parse_core.util import u16, u32, c_str, hexdump
+from parse_core.indent import iprint, indent
+# from parse_core.main import print_thread_info, print_module_info
 
 COLOR_RED = '\x1b[31;1m'
 COLOR_BLUE = '\x1b[34;1m'
@@ -54,6 +56,56 @@ def fetch_latest_coredump(hostname: str) -> Optional[Path]:
             raise e
     return Path(corepath)
 
+str_stop_reason = defaultdict(str, {
+    0: "No reason",
+    0x30002: "Undefined instruction exception",
+    0x30003: "Prefetch abort exception",
+    0x30004: "Data abort exception",
+    0x60080: "Division by zero",
+})
+
+str_status = defaultdict(str, {
+    1: "Running",
+    8: "Waiting",
+    16: "Not started",
+})
+
+str_attr = defaultdict(str, {
+    5: "RX",
+    6: "RW",
+})
+
+reg_names = {
+    13: "SP",
+    14: "LR",
+    15: "PC",
+}
+
+isPC = True
+
+def print_module_info(module):
+    iprint(module.name)
+    with indent():
+        for x, segment in enumerate(module.segments):
+            iprint("Segment {}".format(x + 1))
+            with indent():
+                iprint("Start: 0x{:x}".format(segment.start))
+                iprint("Size: 0x{:x} bytes".format(segment.size))
+                iprint("Attributes: 0x{:x} ({})".format(segment.attr, str_attr[segment.attr & 0xF]))
+                iprint("Alignment: 0x{:x}".format(segment.align))
+
+
+def print_thread_info(thread, core=None, elf=None):
+    iprint(thread.name)
+    with indent():
+        iprint("ID: 0x{:x}".format(thread.uid))
+        iprint("Stop reason: 0x{:x} ({})".format(thread.stop_reason, str_stop_reason[thread.stop_reason]))
+        iprint("Status: 0x{:x} ({})".format(thread.status, str_status[thread.status]))
+        pc = core.get_address_notation("PC", thread.pc)
+        iprint(pc.to_string(elf))
+        if not pc.is_located():
+            iprint(core.get_address_notation("LR", thread.regs.gpr[14]).to_string(elf))
+
 
 def print_coredump(corepath: Path) -> None:
     elfpath = Path(__file__).parent / '../../build/vita/chiaki.elf'
@@ -64,26 +116,47 @@ def print_coredump(corepath: Path) -> None:
         sys.exit(1)
     elf = ElfParser(str(elfpath))
     core = CoreParser(str(corepath))
-    crashed = [t for t in core.threads if t.stop_reason != 0]
+    iprint("=== THREADS ===")
+    crashed = []
+    with indent():
+        for thread in core.threads:
+            if thread.stop_reason != 0:
+                crashed.append(thread)
+            print_thread_info(thread, core, elf)
+    iprint()
     for thread in crashed:
-        print(f"{COLOR_RED}💣💣 Thread 0x{thread.uid:x} crashed due to 0x{thread.stop_reason:x} ({pcore.str_stop_reason[thread.stop_reason]}) 💣💣")
-        pc = core.get_address_notation("PC ", thread.pc)
-        print(pc.to_string(elf) + COLOR_END, end="\n\n")
-        if not pc.is_located():
-            print(core.get_address_notation("LR", thread.regs.gpr[14]).to_string(elf))
-        sp = thread.regs.gpr[13]
-        for x in range(-16, 24):
-            addr = 4 * x + sp
-            data = core.read_vaddr(addr, 4)
-            if not data:
-                continue
-            data = u32(data, 0)
-            prefix = f'{COLOR_RED}🚩' if addr == sp else '  '
-            suffix = f'🚩{COLOR_END}' if addr == sp else ''
-            txt = core.get_address_notation(f"{prefix}0x{addr:x}", data).to_string(elf)
-            if '0xdeadbeef' in txt:
-                continue
-            print(txt + suffix)
+        iprint('=== THREAD "{}" <0x{:x}> CRASHED ({}) ==='.format(thread.name, thread.uid, str_stop_reason[thread.stop_reason]))
+
+        pc = core.get_address_notation('PC', thread.pc)
+        pc.print_disas_if_available(elf)
+        lr = core.get_address_notation('LR', thread.regs.gpr[14])
+        lr.print_disas_if_available(elf)
+
+        iprint("REGISTERS:")
+        with indent():
+            for x in range(14):
+                reg = reg_names.get(x, "R{}".format(x))
+                iprint("{}: 0x{:x}".format(reg, thread.regs.gpr[x]))
+
+            iprint(pc)
+            iprint(lr)
+                
+                
+        iprint()
+
+        iprint("STACK CONTENTS AROUND SP:")
+        with indent():
+            sp = thread.regs.gpr[13]
+            for x in range(-16, 24):
+                addr = 4 * x + sp
+                data = core.read_vaddr(addr, 4)
+                if data:
+                    data = u32(data, 0)
+                    prefix = "     "
+                    if addr == sp:
+                        prefix = "SP =>"
+                    data_notation = core.get_address_notation("{} 0x{:x}".format(prefix, addr), data)
+                    iprint(data_notation.to_string(elf))
 
 
 def _vitacompanion_send_cmd(hostname: str, cmd: str) -> None:
@@ -93,8 +166,8 @@ def _vitacompanion_send_cmd(hostname: str, cmd: str) -> None:
 
 
 def run_app(hostname: str) -> None:
-    _vitacompanion_send_cmd(hostname, 'destroy')
-    time.sleep(0.2)
+    # _vitacompanion_send_cmd(hostname, 'destroy')
+    # time.sleep(0.2)
     _vitacompanion_send_cmd(hostname, 'launch CHIAKI001')
 
 
@@ -140,7 +213,11 @@ def tail_logs(host: str) -> None:
     fp = sock.makefile()
     while True:
         try:
-            logline = fp.readline().replace('[VITA]', '')
+            logline = ""
+            try: 
+                logline = fp.readline().replace('[VITA]', '')
+            except UnicodeDecodeError:
+                pass
             match = LOG_LINE_PAT.match(logline)
             if match is None:
                 continue
@@ -187,7 +264,7 @@ def main():
         upload_app(args.vita_host, args.upload_assets)
     elif args.command == 'launch':
         run_app(args.vita_host)
-        tail_logs(args.vita_host)
+        # tail_logs(args.vita_host)
 
 
 if __name__ == "__main__":

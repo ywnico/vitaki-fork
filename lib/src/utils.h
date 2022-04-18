@@ -93,8 +93,8 @@ static inline int sendto_broadcast(ChiakiLog *log, chiaki_socket_t s, const void
 		freeifaddrs(ifap);
 		return r;
 	}
-#elif defined(__PSVITA__)
-	return sceNetSendto(s, msg, len, flags, (SceNetSockaddr*)to, tolen);
+// #elif defined(__PSVITA__)
+// 	return sceNetSendto(s, msg, len, flags, (SceNetSockaddr*)to, tolen);
 #endif
 	return sendto(s, msg, len, flags, to, tolen);
 }

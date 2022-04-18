@@ -104,10 +104,11 @@ ChiakiErrorCode start_discovery(VitaChiakiDiscoveryCb cb, void* cb_user) {
   opts.cb_user = context.discovery_cb_state;
   opts.ping_ms = 500;
   opts.hosts_max = MAX_NUM_HOSTS;
+  opts.host_drop_pings = HOST_DROP_PINGS;
 
   sockaddr_in addr = {};
   addr.sin_family = AF_INET;
-  addr.sin_addr.s_addr = SCE_NET_INADDR_BROADCAST;
+  addr.sin_addr.s_addr = INADDR_BROADCAST;
   opts.send_addr = (struct sockaddr*) &addr;
   opts.send_addr_size = sizeof(addr);
 

@@ -1,30 +1,34 @@
+#include <psp2/kernel/clib.h>
 #include <psp2/kernel/processmgr.h>
-#include <debugnet.h>
+// #include <debugnet.h>
+
+#include "stdlib.h"
 
 #include "context.h"
 
 VitaChiakiContext context;
 
 void log_cb_debugnet(ChiakiLogLevel lvl, const char *msg, void *user) {
-  int debugnet_lvl;
-  switch (lvl) {
-    case CHIAKI_LOG_ERROR:
-    case CHIAKI_LOG_WARNING:
-      debugnet_lvl = ERROR;
-      break;
-    case CHIAKI_LOG_INFO:
-      debugnet_lvl = INFO;
-      break;
-    //case CHIAKI_LOG_VERBOSE:
-    case CHIAKI_LOG_DEBUG:
-    //case CHIAKI_LOG_ALL:
-      debugnet_lvl = DEBUG;
-      break;
-    default:
-      return;
-  }
-  uint64_t timestamp = sceKernelGetProcessTimeWide();
-  debugNetPrintf(debugnet_lvl, "[CHIAKI] %ju %s\n", timestamp, msg);
+  // int debugnet_lvl;
+  // switch (lvl) {
+  //   case CHIAKI_LOG_ERROR:
+  //   case CHIAKI_LOG_WARNING:
+  //     debugnet_lvl = ERROR;
+  //     break;
+  //   case CHIAKI_LOG_INFO:
+  //     debugnet_lvl = INFO;
+  //     break;
+  //   // case CHIAKI_LOG_VERBOSE:
+  //   case CHIAKI_LOG_DEBUG:
+  //   // case CHIAKI_LOG_ALL:
+  //     debugnet_lvl = DEBUG;
+  //     break;
+  //   default:
+  //     return;
+  // }
+  if (lvl == CHIAKI_LOG_ALL || lvl == CHIAKI_LOG_VERBOSE) return;
+  // uint64_t timestamp = sceKernelGetProcessTimeWide();
+  sceClibPrintf("[CHIAKI] %s\n", msg);
 }
 
 bool vita_chiaki_init_context() {

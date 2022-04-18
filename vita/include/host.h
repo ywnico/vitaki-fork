@@ -4,6 +4,7 @@
 #include <chiaki/regist.h>
 
 #define MAX_NUM_HOSTS 4
+#define HOST_DROP_PINGS 3;
 
 typedef enum vita_chiaki_host_type_t {
   DISCOVERED = 0x01,
@@ -27,4 +28,5 @@ typedef uint8_t MacAddr[6];
 void host_free(VitaChiakiHost* host);
 int host_register(VitaChiakiHost* host, int pin);
 int host_wakeup(VitaChiakiHost* host);
+int host_stream(VitaChiakiHost* host);
 bool mac_addrs_match(MacAddr* a, MacAddr* b);

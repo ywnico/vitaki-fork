@@ -365,7 +365,11 @@ static void *ctrl_thread_func(void *user)
 			break;
 		}
 
-		int received = recv(ctrl->sock, ctrl->recv_buf + ctrl->recv_buf_size, sizeof(ctrl->recv_buf) - ctrl->recv_buf_size, 0);
+		// #ifdef __PSVITA__
+			// int received = sceNetRecv(ctrl->sock, ctrl->recv_buf + ctrl->recv_buf_size, sizeof(ctrl->recv_buf) - ctrl->recv_buf_size, 0);
+		// #else
+			int received = recv(ctrl->sock, ctrl->recv_buf + ctrl->recv_buf_size, sizeof(ctrl->recv_buf) - ctrl->recv_buf_size, 0);
+		// #endif
 		if(received <= 0)
 		{
 			if(received < 0)
@@ -418,7 +422,11 @@ static ChiakiErrorCode ctrl_message_send(ChiakiCtrl *ctrl, uint16_t type, const 
 	*((uint16_t *)(header + 4)) = htons(type);
 	*((uint16_t *)(header + 6)) = 0;
 
-	int sent = send(ctrl->sock, header, sizeof(header), 0);
+	// #ifdef __PSVITA__
+		// int sent = sceNetSend(ctrl->sock, header, sizeof(header), 0);
+	// #else
+		int sent = send(ctrl->sock, header, sizeof(header), 0);
+	// #endif
 	if(sent < 0)
 	{
 		CHIAKI_LOGE(ctrl->session->log, "Failed to send Ctrl Message Header");
@@ -427,7 +435,11 @@ static ChiakiErrorCode ctrl_message_send(ChiakiCtrl *ctrl, uint16_t type, const 
 
 	if(enc)
 	{
-		sent = send(ctrl->sock, enc, payload_size, 0);
+		// #ifdef __PSVITA__
+			// sent = sceNetSend(ctrl->sock, enc, payload_size, 0);
+		// #else
+			sent = send(ctrl->sock, enc, payload_size, 0);
+		// #endif
 		free(enc);
 		if(sent < 0)
 		{
@@ -730,11 +742,11 @@ static ChiakiErrorCode ctrl_connect(ChiakiCtrl *ctrl)
 		return CHIAKI_ERR_INVALID_DATA;
 	}
 
-	#ifdef __PSVITA__
-		chiaki_socket_t sock = sceNetSocket("", sa->sa_family, SCE_NET_SOCK_STREAM, SCE_NET_IPPROTO_IP);
-	#else
+	// #ifdef __PSVITA__
+		// chiaki_socket_t sock = sceNetSocket("", sa->sa_family, SCE_NET_SOCK_STREAM, SCE_NET_IPPROTO_IP);
+	// #else
 		chiaki_socket_t sock = socket(sa->sa_family, SOCK_STREAM, IPPROTO_TCP);
-	#endif
+	// #endif
 	if(CHIAKI_SOCKET_IS_INVALID(sock))
 	{
 		CHIAKI_LOGE(session->log, "Session ctrl socket creation failed.");
@@ -892,11 +904,11 @@ static ChiakiErrorCode ctrl_connect(ChiakiCtrl *ctrl)
 	CHIAKI_LOGI(session->log, "Sending ctrl request");
 	chiaki_log_hexdump(session->log, CHIAKI_LOG_VERBOSE, (const uint8_t *)buf, (size_t)request_len);
 
-	#ifdef __PSVITA__
-		int sent = sceNetSend(sock, buf, request_len, 0);
-	#else
+	// #ifdef __PSVITA__
+	// 	int sent = sceNetSend(sock, buf, request_len, 0);
+	// #else
 		int sent = send(sock, buf, (size_t)request_len, 0);
-	#endif
+	// #endif
 	if(sent < 0)
 	{
 		CHIAKI_LOGE(session->log, "Failed to send ctrl request");

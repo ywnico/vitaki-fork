@@ -25,8 +25,12 @@
 #include <psp2/kernel/rng.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/kernel/processmgr.h>
+#include <psp2/apputil.h>
+#include <psp2/message_dialog.h>
+#include <psp2/net/http.h>
 #include <psp2/net/net.h>
 #include <psp2/net/netctl.h>
+#include <psp2/libssl.h>
 #include <psp2/rtc.h>
 #include <psp2/sysmodule.h>
 #include <psp2/touch.h>
@@ -36,7 +40,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <debugnet.h>
+//#include <debugnet.h>
 
 #include "context.h"
 #include "discovery.h"
@@ -51,22 +55,73 @@ static void vita_init() {
 
   printf("Vita Chiaki %s\n", CHIAKI_VERSION);
 
-  int ret = 0;
+  sceAppUtilInit(&(SceAppUtilInitParam){}, &(SceAppUtilBootParam){});
+  sceCommonDialogSetConfigParam(&(SceCommonDialogConfigParam){});
 
-  // Initialize networking stack with a 100KiB buffer
-  ret = sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
-  size_t net_mem_sz = 100 * 1024;
-  SceNetInitParam net_param = {0};
-  net_param.memory = calloc(net_mem_sz, 1);
-  net_param.size = net_mem_sz;
-  ret = sceNetInit(&net_param);
-  
+  // int ret = 0;
+
+  int ret;
+
+  if ((ret = sceSysmoduleLoadModule(SCE_SYSMODULE_NET)) < 0) {
+    LOGE("SCE_SYSMODULE_NET loading failed: %x\n", ret);
+    return 1;
+  }
+
+  SceNetInitParam param;
+  static char memory[2 * 1024 * 1024];
+  param.memory = memory;
+  param.size = sizeof(memory);
+  param.flags = 0;
+
+  if ((ret = sceNetInit(&param)) < 0) {
+    LOGE("sceNetInit failed: %x\n", ret);
+    return 1;
+  }
+
+  if ((ret = sceNetCtlInit()) < 0) {
+    LOGE("sceNetCtlInit failed %x\n", ret);
+    return 1;
+  }
+
+  // if ((ret = sceSysmoduleLoadModule(SCE_SYSMODULE_HTTP)) < 0) {
+  //   LOGE("SCE_SYSMODULE_HTTP loading failed: %x\n", ret);
+  //   return 1;
+  // }
+
+  // if ((ret = sceHttpInit(1024 * 1024)) < 0) {
+  //   LOGE("sceHttpInit failed: %x\n", ret);
+  //   return 1;
+  // }
+
+  // if ((ret = sceSysmoduleLoadModule(SCE_SYSMODULE_HTTPS)) < 0) {
+  //   LOGE("SCE_SYSMODULE_HTTPS loading failed: %x\n", ret);
+  //   return 1;
+  // }
+
+  if ((ret = sceSysmoduleLoadModule(SCE_SYSMODULE_SSL)) < 0) {
+    LOGE("SCE_SYSMODULE_SSL loading failed: %x\n", ret);
+    return 1;
+  }
+
+  if ((ret = sceSslInit(1024 * 1024)) < 0) {
+    LOGE("SslInit failed: %x\n", ret);
+    return 1;
+  }
+
+  LOGD("Network initialized.\n");
+
+  if ((ret = sceSysmoduleLoadModule(SCE_SYSMODULE_AVCDEC)) < 0) {
+    LOGE("SCE_SYSMODULE_AVCDEC loading failed: %x\n", ret);
+    return 1;
+  }
+
   // Initialize touch sampling
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, 1);
 }
 
+// unsigned int _newlib_heap_size_user = 128 * 1024 * 1024;
+
 int main(int argc, char* argv[]) {
-  debugNetInit("192.168.1.240", 31338, DEBUG);
   vita_init();
 
   // TODO: initialize power control thread

@@ -3,6 +3,11 @@
 #include <chiaki/sock.h>
 #include <fcntl.h>
 
+#ifdef __PSVITA__
+#include <psp2/net/net.h>
+#include <sys/socket.h>
+#endif
+
 CHIAKI_EXPORT ChiakiErrorCode chiaki_socket_set_nonblock(chiaki_socket_t sock, bool nonblock)
 {
 #ifdef _WIN32
@@ -11,7 +16,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_socket_set_nonblock(chiaki_socket_t sock, b
 		return CHIAKI_ERR_UNKNOWN;
 #elif defined(__PSVITA__)
 int nbio = nonblock ? 1 : 0;
-	if (sceNetSetsockopt(sock, SCE_NET_SOL_SOCKET, SCE_NET_SO_NBIO, &nbio, sizeof(int)) < 0) 
+	if (setsockopt(sock, SOL_SOCKET, SO_NONBLOCK, &nbio, sizeof(int)) < 0) 
 		return CHIAKI_ERR_UNKNOWN;
 #else
 	int flags = fcntl(sock, F_GETFL, 0);

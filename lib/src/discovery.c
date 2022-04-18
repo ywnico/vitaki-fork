@@ -149,11 +149,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_discovery_init(ChiakiDiscovery *discovery, 
 
 	discovery->log = log;
 
-	#ifdef __PSVITA__
-		discovery->socket = sceNetSocket("", SCE_NET_AF_INET, SCE_NET_SOCK_DGRAM, SCE_NET_IPPROTO_UDP);
-	#else
+	// #ifdef __PSVITA__
+	// 	discovery->socket = sceNetSocket("", SCE_NET_AF_INET, SCE_NET_SOCK_DGRAM, SCE_NET_IPPROTO_UDP);
+	// #else
 		discovery->socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	#endif
+	// #endif
 	if(CHIAKI_SOCKET_IS_INVALID(discovery->socket))
 	{
 		CHIAKI_LOGE(discovery->log, "Discovery failed to create socket");
@@ -169,11 +169,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_discovery_init(ChiakiDiscovery *discovery, 
 		discovery->local_addr.sa_family = family;
 		if(family == AF_INET6)
 		{
-#ifndef __SWITCH__
+#if !(defined(__SWITCH__) || defined(__PSVITA__))
 			struct in6_addr anyaddr = IN6ADDR_ANY_INIT;
 #endif
 			struct sockaddr_in6 *addr = (struct sockaddr_in6 *)&discovery->local_addr;
-#ifndef __SWITCH__
+#if !(defined(__SWITCH__) || defined(__PSVITA__))
 			addr->sin6_addr = anyaddr;
 #endif
 			addr->sin6_port = htons(port);
@@ -185,11 +185,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_discovery_init(ChiakiDiscovery *discovery, 
 			addr->sin_port = htons(port);
 		}
 
-		#ifdef __PSVITA__
-		  r = sceNetBind(discovery->socket, (SceNetSockaddr*) &discovery->local_addr, sizeof(discovery->local_addr));
-		#else
+		// #ifdef __PSVITA__
+		//   r = sceNetBind(discovery->socket, (SceNetSockaddr*) &discovery->local_addr, sizeof(discovery->local_addr));
+		// #else
 			r = bind(discovery->socket, &discovery->local_addr, sizeof(discovery->local_addr));
-		#endif
+		// #endif
 		if(r >= 0 || !port)
 			break;
 		if(port == CHIAKI_DISCOVERY_PORT_LOCAL_MAX)
@@ -214,11 +214,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_discovery_init(ChiakiDiscovery *discovery, 
 	}
 
 	const int broadcast = 1;
-	#ifdef __PSVITA__
-		r = sceNetSetsockopt(discovery->socket, SCE_NET_SOL_SOCKET, SCE_NET_SO_BROADCAST, (const void *)&broadcast, sizeof(broadcast));
-	#else
+	// #ifdef __PSVITA__
+	// 	r = sceNetSetsockopt(discovery->socket, SCE_NET_SOL_SOCKET, SCE_NET_SO_BROADCAST, (const void *)&broadcast, sizeof(broadcast));
+	// #else
 		r = setsockopt(discovery->socket, SOL_SOCKET, SO_BROADCAST, (const void *)&broadcast, sizeof(broadcast));
-	#endif
+	// #endif
 	if(r < 0)
 		CHIAKI_LOGE(discovery->log, "Discovery failed to setsockopt SO_BROADCAST");
 
@@ -276,7 +276,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_discovery_thread_start(ChiakiDiscoveryThrea
 	ChiakiErrorCode err = chiaki_stop_pipe_init(&thread->stop_pipe);
 	if(err != CHIAKI_ERR_SUCCESS)
 	{
-		CHIAKI_LOGE(discovery->log, "Discovery (thread) failed to create pipe");
+		CHIAKI_LOGE(discovery->log, "Discovery (thread) failed to create pipe %d", err);
 		return err;
 	}
 
@@ -322,11 +322,11 @@ static void *discovery_thread_func(void *user)
 		char buf[512];
 		struct sockaddr client_addr;
 		socklen_t client_addr_size = sizeof(client_addr);
-		#ifdef __PSVITA__
-			int n = sceNetRecvfrom(discovery->socket, buf, sizeof(buf) - 1, 0, (SceNetSockaddr*) &client_addr, &client_addr_size);
-		#else
+		// #ifdef __PSVITA__
+		// 	int n = sceNetRecvfrom(discovery->socket, buf, sizeof(buf) - 1, 0, (SceNetSockaddr*) &client_addr, &client_addr_size);
+		// #else
 			int n = recvfrom(discovery->socket, buf, sizeof(buf) - 1, 0, &client_addr, &client_addr_size);
-		#endif
+		// #endif
 		if(n < 0)
 		{
 			CHIAKI_LOGE(discovery->log, "Discovery thread failed to read from socket");

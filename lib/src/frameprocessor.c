@@ -23,8 +23,8 @@ CHIAKI_EXPORT void chiaki_stream_stats_frame(ChiakiStreamStats *stats, uint64_t 
 {
 	stats->frames++;
 	stats->bytes += size;
-	//float br = (float)chiaki_stream_stats_bitrate(stats, 60) / 1000000.0f;
-	//CHIAKI_LOGD(NULL, "bitrate: %f", br);
+	float br = (float)chiaki_stream_stats_bitrate(stats, 60) / 1000000.0f;
+	CHIAKI_LOGD(NULL, "bitrate: %f", br);
 }
 
 CHIAKI_EXPORT uint64_t chiaki_stream_stats_bitrate(ChiakiStreamStats *stats, uint64_t framerate)
@@ -170,9 +170,10 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_frame_processor_put_unit(ChiakiFrameProcess
 	{
 		CHIAKI_LOGW(frame_processor->log, "Received duplicate unit");
 		return CHIAKI_ERR_INVALID_DATA;
+	} else {
+		unit->data_size = packet->data_size;
 	}
 
-	unit->data_size = packet->data_size;
 	if(!frame_processor->flushed)
 	{
 		memcpy(frame_processor->frame_buf + packet->unit_index * frame_processor->buf_stride_per_unit,

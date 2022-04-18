@@ -19,3 +19,6 @@
 [submodule "scripts/vita/parse_core"]
 	path = scripts/vita/parse_core
 	url = https://github.com/xyzz/vita-parse-core
+[submodule "vita/third_party/tomlc99"]
+	path = vita/third_party/tomlc99
+	url = https://github.com/cktan/tomlc99.git

@@ -175,11 +175,12 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnectio
 	stream_connection->state = STATE_TAKION_CONNECT;
 	stream_connection->state_finished = false;
 	stream_connection->state_failed = false;
+	takion_info.log = session->log;
 	err = chiaki_takion_connect(&stream_connection->takion, &takion_info);
 	free(takion_info.sa);
 	if(err != CHIAKI_ERR_SUCCESS)
 	{
-		CHIAKI_LOGE(session->log, "StreamConnection connect failed");
+		CHIAKI_LOGE(session->log, "StreamConnection connect failed %d", err);
 		chiaki_mutex_unlock(&stream_connection->state_mutex);
 		goto err_video_receiver;
 	}
@@ -661,6 +662,8 @@ static void stream_connection_takion_data_expect_streaminfo(ChiakiStreamConnecti
 		CHIAKI_LOGE(stream_connection->log, "StreamConnection failed to decode data protobuf");
 		return;
 	}
+
+	CHIAKI_LOGI(stream_connection->log, "StreamConnection recieved payload of type %d", msg.type);
 
 	if(msg.type != tkproto_TakionMessage_PayloadType_STREAMINFO || !msg.has_stream_info_payload)
 	{

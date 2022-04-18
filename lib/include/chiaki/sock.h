@@ -20,15 +20,15 @@ typedef SOCKET chiaki_socket_t;
 #define CHIAKI_SOCKET_ERROR_FMT "%d"
 #define CHIAKI_SOCKET_ERROR_VALUE (WSAGetLastError())
 #define CHIAKI_SOCKET_EINPROGRESS (WSAGetLastError() == WSAEWOULDBLOCK)
-#elif defined(__PSVITA__)
-#include <psp2/net/net.h>
-typedef int chiaki_socket_t;
-#define CHIAKI_SOCKET_IS_INVALID(s) ((s) < 0)
-#define CHIAKI_INVALID_SOCKET (-1)
-#define CHIAKI_SOCKET_CLOSE(s) sceNetSocketClose (s)
-#define CHIAKI_SOCKET_ERROR_FMT "0x%x"
-#define CHIAKI_SOCKET_ERROR_VALUE (errno)
-#define CHIAKI_SOCKET_EINPROGRESS (errno == SCE_NET_EINPROGRESS)
+// #elif defined(__PSVITA__)
+// #include <psp2/net/net.h>
+// typedef int chiaki_socket_t;
+// #define CHIAKI_SOCKET_IS_INVALID(s) ((s) < 0)
+// #define CHIAKI_INVALID_SOCKET (-1)
+// #define CHIAKI_SOCKET_CLOSE(s) sceNetSocketClose (s)
+// #define CHIAKI_SOCKET_ERROR_FMT "0x%x"
+// #define CHIAKI_SOCKET_ERROR_VALUE (errno)
+// #define CHIAKI_SOCKET_EINPROGRESS (errno == SCE_NET_EINPROGRESS)
 #else
 #include <unistd.h>
 #include <errno.h>

@@ -11,6 +11,7 @@ build_chiaki (){
 		cmake -B "./build" \
 			-DCMAKE_BUILD_TYPE=Debug \
 			-DCMAKE_TOOLCHAIN_FILE=${VITASDK}/share/vita.toolchain.cmake \
+			-DCMAKE_C_FLAGS="-g -O0" \
 			-DCHIAKI_ENABLE_VITA=ON \
 			-DCHIAKI_ENABLE_TESTS=OFF \
 			-DCHIAKI_ENABLE_CLI=OFF \

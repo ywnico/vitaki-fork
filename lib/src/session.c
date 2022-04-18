@@ -218,6 +218,9 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_session_init(ChiakiSession *session, Chiaki
 	chiaki_controller_state_set_idle(&session->controller_state);
 
 	session->connect_info.ps5 = connect_info->ps5;
+	#ifdef __PSVITA__
+		strcpy(session->connect_info.hostname, connect_info->host); //HACK
+	#endif
 	memcpy(session->connect_info.regist_key, connect_info->regist_key, sizeof(session->connect_info.regist_key));
 	memcpy(session->connect_info.morning, connect_info->morning, sizeof(session->connect_info.morning));
 
@@ -597,28 +600,29 @@ static ChiakiErrorCode session_thread_request_session(ChiakiSession *session, Ch
 		set_port(sa, htons(SESSION_PORT));
 
 		#ifdef __PSVITA__
-			int errno;
-			int rid = sceNetResolverCreate("resolver", NULL, 0);
-			if (rid < 0) {
-				errno = rid & 0xFF;
-				goto vitadns_err;
-			}
-			sockaddr_in* sa_in = (sockaddr_in*) sa;
-			SceNetInAddr addr = { (sa_in->sin_addr).s_addr };
-			int r = sceNetResolverStartAton(
-				rid,
-				&addr,
-				session->connect_info.hostname,
-				sizeof(session->connect_info.hostname),
-				1500,
-				3,
-				0);
-		  if (r < 0) {
-			vitadns_err:
-				CHIAKI_LOGE(session->log, "Failed to resolve hostname, %d", errno);
-				memcpy(session->connect_info.hostname, "unknown", 8);
-			}
-			sceNetResolverDestroy(rid);
+		//  FIXME: this is broken, error 0
+		// 	int errno;
+		// 	int rid = sceNetResolverCreate("resolver", NULL, 0);
+		// 	if (rid < 0) {
+		// 		errno = rid & 0xFF;
+		// 		goto vitadns_err;
+		// 	}
+		// 	sockaddr_in* sa_in = (sockaddr_in*) sa;
+		// 	SceNetInAddr addr = { (sa_in->sin_addr).s_addr };
+		// 	int r = sceNetResolverStartAton(
+		// 		rid,
+		// 		&addr,
+		// 		session->connect_info.hostname,
+		// 		sizeof(session->connect_info.hostname),
+		// 		1500,
+		// 		3,
+		// 		0);
+		//   if (r < 0) {
+		// 	vitadns_err:
+		// 		CHIAKI_LOGE(session->log, "Failed to resolve hostname, %d", errno);
+		// 		memcpy(session->connect_info.hostname, "unknown", 8);
+		// 	}
+		// 	sceNetResolverDestroy(rid);
 		#else
 			// TODO: this can block, make cancelable somehow
 			int r = getnameinfo(sa, (socklen_t)ai->ai_addrlen, session->connect_info.hostname, sizeof(session->connect_info.hostname), NULL, 0, NI_NUMERICHOST);
@@ -631,11 +635,11 @@ static ChiakiErrorCode session_thread_request_session(ChiakiSession *session, Ch
 
 		CHIAKI_LOGI(session->log, "Trying to request session from %s:%d", session->connect_info.hostname, SESSION_PORT);
 
-		#ifdef __PSVITA__
-		session_sock = sceNetSocket("", ai->ai_family, SCE_NET_SOCK_STREAM, 0);
-		#else
+		// #ifdef __PSVITA__
+		// session_sock = sceNetSocket("", ai->ai_family, SCE_NET_SOCK_STREAM, 0);
+		// #else
 		session_sock = socket(ai->ai_family, SOCK_STREAM, 0);
-		#endif
+		// #endif
 		if(CHIAKI_SOCKET_IS_INVALID(session_sock))
 		{
 #ifdef _WIN32
@@ -667,7 +671,8 @@ static ChiakiErrorCode session_thread_request_session(ChiakiSession *session, Ch
 		}
 		else if(err != CHIAKI_ERR_SUCCESS)
 		{
-			CHIAKI_LOGE(session->log, "Session request connect failed: %s", chiaki_error_string(err));
+			// CHIAKI_LOGE(session->log, "Session request connect failed: %s", chiaki_error_string(err));
+			CHIAKI_LOGE(session->log, "Session request connect failed: %d", err);
 			if(err == CHIAKI_ERR_CONNECTION_REFUSED)
 				session->quit_reason = CHIAKI_QUIT_REASON_SESSION_REQUEST_CONNECTION_REFUSED;
 			else
@@ -750,11 +755,11 @@ static ChiakiErrorCode session_thread_request_session(ChiakiSession *session, Ch
 	CHIAKI_LOGI(session->log, "Sending session request");
 	chiaki_log_hexdump(session->log, CHIAKI_LOG_VERBOSE, (uint8_t *)buf, request_len);
 
-	#ifdef __PSVITA__
-	int sent = sceNetSend(session_sock, buf, request_len, 0);
-	#else
+	// #ifdef __PSVITA__
+	// int sent = sceNetSend(session_sock, buf, request_len, 0);
+	// #else
 	int sent = send(session_sock, buf, (size_t)request_len, 0);
-	#endif
+	// #endif
 	if(sent < 0)
 	{
 		CHIAKI_LOGE(session->log, "Failed to send session request");

@@ -149,7 +149,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_mutex_init(ChiakiMutex *mutex, bool rec)
 #elif defined(__PSVITA__)
 	snprintf(name_buffer, sizeof(name_buffer), "0x%08X", (unsigned int) mutex);
 	mutex->mutex_id = sceKernelCreateMutex(
-		name_buffer, 0, rec ? SCE_KERNEL_MUTEX_ATTR_RECURSIVE : 0, 0);
+		name_buffer, rec ? SCE_KERNEL_MUTEX_ATTR_RECURSIVE : 0, 0, 0);
 	if (mutex->mutex_id < 0) {
 		return CHIAKI_ERR_UNKNOWN;
 	}

@@ -35,9 +35,9 @@ typedef struct chiaki_stop_pipe_t
 #else
 	int fds[2];
 #endif
-#ifdef __PSVITA__
-  int epoll_fd;
-#endif
+// #ifdef __PSVITA__
+//   int epoll_fd;
+// #endif
 } ChiakiStopPipe;
 
 struct sockaddr;

@@ -4,10 +4,16 @@
 #include <string.h>
 #include <vita2d.h>
 #include <psp2/ctrl.h>
+#include <psp2/message_dialog.h>
+#include <psp2/registrymgr.h> 
+#include <psp2/ime_dialog.h>
+#include <chiaki/base64.h>
 
 #include "context.h"
 #include "host.h"
 #include "ui.h"
+#include "util.h"
+#include "video.h"
 
 #define COLOR_WHITE RGBA8(255, 255, 255, 255)
 #define COLOR_BLACK RGBA8(0, 0, 0, 255)
@@ -58,6 +64,7 @@ typedef enum ui_main_widget_id_t {
   UI_MAIN_WIDGET_REGISTER_BTN,
   UI_MAIN_WIDGET_DISCOVERY_BTN,
   UI_MAIN_WIDGET_SETTINGS_BTN,
+  UI_MAIN_WIDGET_TEXT_INPUT,
   UI_MAIN_WIDGET_HOST_TILE,
 } MainWidgetId;
 
@@ -68,12 +75,14 @@ typedef enum ui_host_action_t {
   UI_HOST_ACTION_STREAM,  // Only for online hosts
   UI_HOST_ACTION_DELETE,  // Only for manually added hosts
   UI_HOST_ACTION_EDIT,    // Only for registered/manually added hosts
+  UI_HOST_ACTION_REGISTER,    // Only for discovered hosts
 } UIHostAction;
 
 /// Types of screens that can be rendered
 typedef enum ui_screen_type_t {
   UI_SCREEN_TYPE_MAIN = 0,
   UI_SCREEN_TYPE_REGISTER,
+  UI_SCREEN_TYPE_REGISTER_HOST,
   UI_SCREEN_TYPE_ADD_HOST,
   UI_SCREEN_TYPE_EDIT_HOST,
   UI_SCREEN_TYPE_STREAM,
@@ -128,7 +137,7 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
   bool discovered = host->type & DISCOVERED;
   bool registered = host->type & REGISTERED;
   bool added = host->type & MANUALLY_ADDED;
-  bool mutable = true;//(added || registered);
+  bool mutable = (added || registered);
   bool at_rest = discovered && host->discovery_state->state ==
                                    CHIAKI_DISCOVERY_HOST_STATE_STANDBY;
 
@@ -189,6 +198,7 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
   int old_btn = context.ui_state.old_button_state;
   int last_slot = context.num_hosts - 1;
   if (is_active) {
+    if (context.active_host != host) context.active_host = host;
     if (btn_pressed(SCE_CTRL_UP)) {
       if (host_slot < 2) {
         // Set focus on the last button of the header bar
@@ -216,22 +226,27 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
             UI_MAIN_WIDGET_HOST_TILE | (host_slot - 1);
       }
     }
+    // Determine action to perform
+    if (registered && btn_pressed(SCE_CTRL_CROSS)) {
+      if (host->discovery_state->state == CHIAKI_DISCOVERY_HOST_STATE_STANDBY) {
+        return UI_HOST_ACTION_WAKEUP;
+      } else {
+        vita2d_end_drawing();
+        vita2d_common_dialog_update();
+        vita2d_swap_buffers();
+        host_stream(context.active_host);
+        return UI_HOST_ACTION_STREAM;
+      }
+    } else if (!registered && !added && discovered && btn_pressed(SCE_CTRL_CROSS)){
+      return UI_HOST_ACTION_REGISTER;
+    } else if (mutable && btn_pressed(SCE_CTRL_TRIANGLE)) {
+      return UI_HOST_ACTION_DELETE;
+    } else if (mutable && btn_pressed(SCE_CTRL_SQUARE)) {
+      return UI_HOST_ACTION_EDIT;
+    }
   }
   if (is_touched(x, y, HOST_SLOT_W, HOST_SLOT_H)) {
     context.ui_state.next_active_item = UI_MAIN_WIDGET_HOST_TILE | host_slot;
-  }
-
-  // Determine action to perform
-  if (registered && btn_pressed(SCE_CTRL_CROSS)) {
-    if (host->discovery_state->state == CHIAKI_DISCOVERY_HOST_STATE_STANDBY) {
-      return UI_HOST_ACTION_WAKEUP;
-    } else {
-      return UI_HOST_ACTION_STREAM;
-    }
-  } else if (mutable && btn_pressed(SCE_CTRL_TRIANGLE)) {
-    return UI_HOST_ACTION_DELETE;
-  } else if (mutable && btn_pressed(SCE_CTRL_SQUARE)) {
-    return UI_HOST_ACTION_EDIT;
   }
   return UI_HOST_ACTION_NONE;
 }
@@ -280,12 +295,60 @@ bool header_button(MainWidgetId id, int x_offset, vita2d_texture* default_img,
   }
   return is_active && btn_pressed(SCE_CTRL_CROSS);
 }
-
-void text_input(int x, int y, int w, int h, char* label,
+uint16_t IMEInput[SCE_IME_DIALOG_MAX_TEXT_LENGTH + 1];
+bool showingIME = false;
+char* text_input(MainWidgetId id, int x, int y, int w, int h, char* label,
                 char* value, int max_len) {
-  vita2d_draw_rectangle(x, y, w, h, COLOR_BLACK);
+  bool is_active = context.ui_state.active_item == id;
+  if (is_active) {
+    vita2d_draw_rectangle(x + 300 - 3, y - 3, w + 6, h + 6, COLOR_ACTIVE);
+    if (btn_pressed(SCE_CTRL_CROSS)) {
+      SceImeDialogParam param;
+
+      sceImeDialogParamInit(&param);
+			param.supportedLanguages = SCE_IME_LANGUAGE_ENGLISH;
+			param.languagesForced = SCE_TRUE;
+			param.type = SCE_IME_DIALOG_TEXTBOX_MODE_DEFAULT;
+			param.option = SCE_IME_OPTION_NO_ASSISTANCE;
+			param.textBoxMode = SCE_IME_DIALOG_TEXTBOX_MODE_DEFAULT;
+      uint16_t IMELabel[label != NULL ? sizeof(label) + 1 : sizeof("Text")];
+      utf8_to_utf16(label != NULL ? label : "Text", IMELabel);
+			param.title = IMELabel;
+			param.maxTextLength = SCE_IME_DIALOG_MAX_TEXT_LENGTH;
+      if (value != NULL) {
+        uint16_t IMEValue[sizeof(value)];
+        utf8_to_utf16(value, IMEValue);
+			  param.initialText = IMEValue;
+      }
+			param.inputTextBuffer = IMEInput;
+
+      showingIME = true;
+      sceImeDialogInit(&param) > 0;
+    }
+  }
+  vita2d_draw_rectangle(x + 300, y, w, h, COLOR_BLACK);
   // vita2d_draw_texture(icon, x + 20, y + h / 2);
-  vita2d_font_draw_text(font, x + 20, y + h / 1.5, COLOR_WHITE, 40, value);
+  if (label != NULL) vita2d_font_draw_text(font, x, y + h / 1.5, COLOR_WHITE, 40, label);
+  if (value != NULL) vita2d_font_draw_text(font, x + 300, y + h / 1.5, COLOR_WHITE, 40, value);
+  
+  if (showingIME) {
+    if (sceImeDialogGetStatus() == SCE_COMMON_DIALOG_STATUS_FINISHED) {
+      showingIME = false;
+      SceImeDialogResult result={};
+      sceImeDialogGetResult(&result);
+      sceImeDialogTerm();
+      if (result.button == SCE_IME_DIALOG_BUTTON_ENTER) {
+
+        uint16_t*last_input = (result.button == SCE_IME_DIALOG_BUTTON_ENTER) ? IMEInput:u"";
+        char IMEResult[SCE_IME_DIALOG_MAX_TEXT_LENGTH + 1];
+        utf16_to_utf8(IMEInput, IMEResult);
+        LOGD("IME returned %s", IMEResult);
+        return strdup(IMEResult);
+      }
+    }
+  }
+  return NULL;
+
   // TODO: Render label + icon
   // TODO: Render input border
   // TODO: Render value
@@ -308,6 +371,18 @@ int choice_input(int x, int y, int w, int h, char* label, vita2d_texture* icon,
   // TODO: Render value
   // TODO: Button/touch handling to update choice
   return -1;
+}
+
+void load_psn_id_if_needed() {
+  if (!context.config.psn_account_id || strlen(context.config.psn_account_id) < 1) {
+    char accIDBuf[8];
+    memset(accIDBuf, 0, sizeof(accIDBuf));
+    free(context.config.psn_account_id);
+    context.config.psn_account_id = (char*)malloc(get_base64_size(sizeof(accIDBuf))+1); // WHY IS +1 NEEDED HERE ONLY WHEN RUN ON THE FIRST FRAME BECAUSE ITS 14 THEN FOR SOME REASON AND ADDING 1 MAKES IT 12????????? BUT THEN EVERY TIME AFTER IT REMAINS 12 DESPITE ADDING 1 SO IT SOMEHOW WORKS?????????????????????????????????????
+    sceRegMgrGetKeyBin("/CONFIG/NP/", "account_id", accIDBuf, sizeof(accIDBuf));
+    chiaki_base64_encode(accIDBuf, sizeof(accIDBuf), context.config.psn_account_id, get_base64_size(sizeof(accIDBuf)));
+    LOGD("size of id %d", strlen(context.config.psn_account_id));
+  }
 }
 
 /// Draw the header bar for the main menu screen
@@ -373,22 +448,51 @@ UIScreenType draw_main_menu() {
     next_screen = UI_SCREEN_TYPE_STREAM;
   } else if (host_action == UI_HOST_ACTION_EDIT) {
     next_screen = UI_SCREEN_TYPE_EDIT_HOST;
+  } else if (host_action == UI_HOST_ACTION_REGISTER) {
+    next_screen = UI_SCREEN_TYPE_REGISTER_HOST;
   }
   return next_screen;
 }
-
+const char* PSNID_LABEL = "PSN ID";
 /// Draw the settings form
 /// @return whether the dialog should keep rendering
 bool draw_settings() {
-  char* val = "val";
-  text_input(300, 300, 600, 80, val, val, 30);
+  char* text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 0, 30, 30, 600, 80, PSNID_LABEL, context.config.psn_account_id, 12);
+  if (text != NULL) {
+    // LOGD("text is %s", text);
+    free(context.config.psn_account_id);
+    context.config.psn_account_id = text;
+  }
+  if (btn_pressed(SCE_CTRL_CIRCLE)) {
+    context.ui_state.next_active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
+    // free(context.config.psn_account_id);
+    // context.config.psn_account_id = NULL;
+    return false;
+  }
   return true;
 }
 
+char* LINK_CODE;
+const char* LINK_CODE_LABEL = "Registration code";
+
 /// Draw the form to register a host
 /// @return whether the dialog should keep rendering
-bool draw_registration_dialog() { return false; }
-
+bool draw_registration_dialog() { 
+  char* text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 1, 30, 30, 600, 80, LINK_CODE_LABEL, LINK_CODE, 8);
+  if (text != NULL) {
+    // LOGD("text is %s", text);
+    free(LINK_CODE);
+    LINK_CODE = text;
+  }
+  if (btn_pressed(SCE_CTRL_CIRCLE)) {
+    host_register(context.active_host, atoi(LINK_CODE));
+    context.ui_state.next_active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
+    // free(context.config.psn_account_id);
+    // context.config.psn_account_id = NULL;
+    return false;
+  }
+  return true;
+}
 /// Draw the form to manually add a new host
 /// @return whether the dialog should keep rendering
 bool draw_add_host_dialog() { 
@@ -405,7 +509,11 @@ bool draw_edit_host_dialog() {
 }
 /// Render the current frame of an active stream
 /// @return whether the stream should keep rendering
-bool draw_stream() { return false; }
+bool draw_stream() { 
+  if (context.stream.is_streaming) context.stream.is_streaming = false;
+  
+  return false;
+}
 
 void init_ui() {
   vita2d_init();
@@ -421,55 +529,66 @@ void draw_ui() {
   SceCtrlData ctrl;
   memset(&ctrl, 0, sizeof(ctrl));
 
+
   UIScreenType screen = UI_SCREEN_TYPE_MAIN;
 
+  load_psn_id_if_needed();
+
   while (true) {
-    // Get current controller state
-    if (!sceCtrlReadBufferPositive(0, &ctrl, 1)) {
-      // Try again...
-      LOGE("Failed to get controller state");
-      continue;
-    }
-    context.ui_state.old_button_state = context.ui_state.button_state;
-    context.ui_state.button_state = ctrl.buttons;
+    // if (!context.stream.is_streaming) {
+      // sceKernelDelayThread(1000 * 10);
+      // Get current controller state
+      if (!sceCtrlReadBufferPositive(0, &ctrl, 1)) {
+        // Try again...
+        LOGE("Failed to get controller state");
+        continue;
+      }
+      context.ui_state.old_button_state = context.ui_state.button_state;
+      context.ui_state.button_state = ctrl.buttons;
 
-    // Get current touch state
-    sceTouchPeek(SCE_TOUCH_PORT_FRONT, &(context.ui_state.touch_state_front),
-                 1);
+      // Get current touch state
+      sceTouchPeek(SCE_TOUCH_PORT_FRONT, &(context.ui_state.touch_state_front),
+                  1);
 
-    if (context.ui_state.next_active_item >= 0) {
-      context.ui_state.active_item = context.ui_state.next_active_item;
-      context.ui_state.next_active_item = -1;
-    }
+      if (context.ui_state.next_active_item >= 0) {
+        context.ui_state.active_item = context.ui_state.next_active_item;
+        context.ui_state.next_active_item = -1;
+      }
+      if (!context.stream.is_streaming) {
+        vita2d_start_drawing();
+        vita2d_clear_screen();
 
-    vita2d_start_drawing();
-    vita2d_clear_screen();
-
-    // Render the current screen
-    if (screen == UI_SCREEN_TYPE_MAIN) {
-      screen = draw_main_menu();
-    } else if (screen == UI_SCREEN_TYPE_REGISTER) {
-      if (!draw_registration_dialog()) {
-        screen = UI_SCREEN_TYPE_MAIN;
+        // Render the current screen
+        if (screen == UI_SCREEN_TYPE_MAIN) {
+          screen = draw_main_menu();
+        } else if (screen == UI_SCREEN_TYPE_REGISTER_HOST) {
+          context.ui_state.next_active_item = UI_MAIN_WIDGET_TEXT_INPUT | 1;
+          if (!draw_registration_dialog()) {
+            screen = UI_SCREEN_TYPE_MAIN;
+          }
+        } else if (screen == UI_SCREEN_TYPE_ADD_HOST) {
+          if (!draw_add_host_dialog()) {
+            screen = UI_SCREEN_TYPE_MAIN;
+          }
+        } else if (screen == UI_SCREEN_TYPE_EDIT_HOST) {
+          if (!draw_edit_host_dialog()) {
+            screen = UI_SCREEN_TYPE_MAIN;
+          }
+        } else if (screen == UI_SCREEN_TYPE_STREAM) {
+          if (!draw_stream()) {
+            screen = UI_SCREEN_TYPE_MAIN;
+          }
+        } else if (screen == UI_SCREEN_TYPE_SETTINGS) {
+          context.ui_state.next_active_item = UI_MAIN_WIDGET_TEXT_INPUT | 0;
+          load_psn_id_if_needed();
+          if (!draw_settings()) {
+            screen = UI_SCREEN_TYPE_MAIN;
+          }
+        }
+        vita2d_end_drawing();
+        vita2d_common_dialog_update();
+        vita2d_swap_buffers();
       }
-    } else if (screen == UI_SCREEN_TYPE_ADD_HOST) {
-      if (!draw_add_host_dialog()) {
-        screen = UI_SCREEN_TYPE_MAIN;
-      }
-    } else if (screen == UI_SCREEN_TYPE_EDIT_HOST) {
-      if (!draw_edit_host_dialog()) {
-        screen = UI_SCREEN_TYPE_MAIN;
-      }
-    } else if (screen == UI_SCREEN_TYPE_STREAM) {
-      if (!draw_stream()) {
-        screen = UI_SCREEN_TYPE_MAIN;
-      }
-    } else if (screen == UI_SCREEN_TYPE_SETTINGS) {
-      if (!draw_settings()) {
-        screen = UI_SCREEN_TYPE_MAIN;
-      }
-    }
-    vita2d_end_drawing();
-    vita2d_swap_buffers();
+    // }
   }
 }

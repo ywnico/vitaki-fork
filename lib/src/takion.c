@@ -181,7 +181,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 
 	takion->log = info->log;
 	takion->version = info->protocol_version;
-
+	CHIAKI_LOGI(takion->log, "Init Takion");
 	switch(takion->version)
 	{
 		case 7:
@@ -202,6 +202,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 	ret = chiaki_mutex_init(&takion->gkcrypt_local_mutex, true);
 	if(ret != CHIAKI_ERR_SUCCESS)
 		return ret;
+	CHIAKI_LOGI(takion->log, "Mutex1 created");
 	takion->key_pos_local = 0;
 	takion->gkcrypt_remote = NULL;
 	takion->cb = info->cb;
@@ -213,6 +214,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 	ret = chiaki_mutex_init(&takion->seq_num_local_mutex, false);
 	if(ret != CHIAKI_ERR_SUCCESS)
 		goto error_gkcrypt_local_mutex;
+	CHIAKI_LOGI(takion->log, "Mutex2 created");
 	takion->tag_remote = 0;
 
 	takion->enable_crypt = info->enable_crypt;
@@ -229,7 +231,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 		goto error_seq_num_local_mutex;
 	}
 
-	takion->sock = socket(info->sa->sa_family, SOCK_DGRAM, IPPROTO_UDP);
+	// #ifdef __PSVITA__
+	// 	takion->sock = sceNetSocket("", info->sa->sa_family, SCE_NET_SOCK_DGRAM, SCE_NET_IPPROTO_UDP);
+	// #else
+		takion->sock = socket(info->sa->sa_family, SOCK_DGRAM, IPPROTO_UDP);
+	// #endif
 	if(CHIAKI_SOCKET_IS_INVALID(takion->sock))
 	{
 		CHIAKI_LOGE(takion->log, "Takion failed to create socket");
@@ -238,7 +244,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 	}
 
 	const int rcvbuf_val = takion->a_rwnd;
-	int r = setsockopt(takion->sock, SOL_SOCKET, SO_RCVBUF, (const void *)&rcvbuf_val, sizeof(rcvbuf_val));
+	// #ifdef __PSVITA__
+	// 	int r = sceNetSetsockopt(takion->sock, SCE_NET_SOL_SOCKET, SCE_NET_SO_RCVBUF, (const void *)&rcvbuf_val, sizeof(rcvbuf_val));
+	// #else
+		int r = setsockopt(takion->sock, SOL_SOCKET, SO_RCVBUF, (const void *)&rcvbuf_val, sizeof(rcvbuf_val));
+	// #endif
 	if(r < 0)
 	{
 		CHIAKI_LOGE(takion->log, "Takion failed to setsockopt SO_RCVBUF: %s", strerror(errno));
@@ -254,6 +264,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 #elif defined(__FreeBSD__) || defined(__SWITCH__)
 		const int dontfrag_val = 1;
 		r = setsockopt(takion->sock, IPPROTO_IP, IP_DONTFRAG, (const void *)&dontfrag_val, sizeof(dontfrag_val));
+#elif defined(__PSVITA__)
+		CHIAKI_LOGW(takion->log, "Don't fragment is not supported on this platform, MTU values may be incorrect.");
+		#define NO_DONTFRAG
+		// const int dontfrag_val = 1;
+		// r = sceNetSetsockopt(takion->sock, SCE_NET_IPPROTO_IP, SCE_NET_IP_DF, (const void *)&dontfrag_val, sizeof(dontfrag_val));
 #elif defined(IP_PMTUDISC_DO)
 		const int mtu_discover_val = IP_PMTUDISC_DO;
 		r = setsockopt(takion->sock, IPPROTO_IP, IP_MTU_DISCOVER, (const void *)&mtu_discover_val, sizeof(mtu_discover_val));
@@ -274,7 +289,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 #endif
 	}
 
-	r = connect(takion->sock, info->sa, info->sa_len);
+	// #ifdef __PSVITA__
+	// 	r = sceNetConnect(takion->sock, (SceNetSockaddr*)info->sa, info->sa_len);
+	// #else
+		r = connect(takion->sock, info->sa, info->sa_len);
+	// #endif
 	if(r < 0)
 	{
 		CHIAKI_LOGE(takion->log, "Takion failed to connect: %s", strerror(errno));
@@ -340,7 +359,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_crypt_advance_key_pos(ChiakiTakion *
 
 CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_send_raw(ChiakiTakion *takion, const uint8_t *buf, size_t buf_size)
 {
-	int r = send(takion->sock, buf, buf_size, 0);
+	// #ifdef __PSVITA__
+	// 	int r = sceNetSend(takion->sock, buf, buf_size, 0);
+	// #else
+		int r = send(takion->sock, buf, buf_size, 0);
+	// #endif
 	if(r < 0)
 		return CHIAKI_ERR_NETWORK;
 	return CHIAKI_ERR_SUCCESS;
@@ -414,8 +437,8 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_send(ChiakiTakion *takion, uint8_t *
 	if(err != CHIAKI_ERR_SUCCESS)
 		return err;
 
-	//CHIAKI_LOGD(takion->log, "Takion sending:");
-	//chiaki_log_hexdump(takion->log, CHIAKI_LOG_DEBUG, buf, buf_size);
+	// CHIAKI_LOGD(takion->log, "Takion sending:");
+	// chiaki_log_hexdump(takion->log, CHIAKI_LOG_DEBUG, buf, buf_size);
 
 	return chiaki_takion_send_raw(takion, buf, buf_size);
 }
@@ -787,7 +810,11 @@ static ChiakiErrorCode takion_recv(ChiakiTakion *takion, uint8_t *buf, size_t *b
 		return err;
 	}
 
-	int received_sz = recv(takion->sock, buf, *buf_size, 0);
+	// #ifdef __PSVITA__
+	// 	int received_sz = sceNetRecv(takion->sock, buf, *buf_size, 0);
+	// #else
+		int received_sz = recv(takion->sock, buf, *buf_size, 0);
+	// #endif
 	if(received_sz <= 0)
 	{
 		if(received_sz < 0)
@@ -908,8 +935,8 @@ static void takion_handle_packet_message(ChiakiTakion *takion, uint8_t *buf, siz
 		return;
 	}
 
-	//CHIAKI_LOGD(takion->log, "Takion received message with tag %#x, key pos %#x, type (%#x, %#x), payload size %#x, payload:", msg.tag, msg.key_pos, msg.type_a, msg.type_b, msg.payload_size);
-	//chiaki_log_hexdump(takion->log, CHIAKI_LOG_DEBUG, buf, buf_size);
+	// CHIAKI_LOGD(takion->log, "Takion received message with tag %#x, key pos %#x, type %#x, payload size %#x, payload:", msg.tag, msg.key_pos, msg.chunk_type, msg.payload_size);
+	// chiaki_log_hexdump(takion->log, CHIAKI_LOG_DEBUG, buf, buf_size);
 
 	switch(msg.chunk_type)
 	{

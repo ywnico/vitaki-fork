@@ -13,6 +13,7 @@ add_executable(${VITA_APP_NAME}.elf
     src/ui.c
     src/util.c
     src/host.c
+    src/video.c
 
     third_party/tomlc99/toml.c
     # src/lib/ime.c
@@ -32,7 +33,6 @@ target_link_libraries(${VITA_APP_NAME}.elf
   # TODO: Do we really need all of those?
   chiaki-lib
   vita2d
-  debugnet
   ssl
   crypto
   opus
@@ -43,7 +43,9 @@ target_link_libraries(${VITA_APP_NAME}.elf
   z
   m
   c
+  -Wl,--whole-archive
   pthread
+  -Wl,--no-whole-archive
   zip
 
   SceDisplay_stub
@@ -54,8 +56,11 @@ target_link_libraries(${VITA_APP_NAME}.elf
   ScePvf_stub
   SceCommonDialog_stub
   SceAppMgr_stub
+  SceAppUtil_stub
+  SceRegistryMgr_stub
 
   SceTouch_stub
+#   SceHttp_stub
   SceNet_stub
   SceNetCtl_stub
   ScePower_stub

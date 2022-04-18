@@ -2,13 +2,14 @@
 
 #include <chiaki/stoppipe.h>
 #include <chiaki/sock.h>
+#include <chiaki/log.h>
 
 #include <fcntl.h>
 
 #ifdef _WIN32
 #include <ws2tcpip.h>
 #elif defined(__PSVITA__)
-#include <psp2/net/net.h>
+// #include <psp2/net/net.h>
 #else
 #include <unistd.h>
 #include <sys/socket.h>
@@ -21,8 +22,8 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_init(ChiakiStopPipe *stop_pipe)
 	stop_pipe->event = WSACreateEvent();
 	if(stop_pipe->event == WSA_INVALID_EVENT)
 		return CHIAKI_ERR_UNKNOWN;
-#elif defined(__SWITCH__)
-	// currently pipe or socketpare are not available on switch
+#elif defined(__SWITCH__) || defined(__PSVITA__)
+	// currently pipe or socketpare are not available on switch or vita
 	// use a custom udp socket as pipe
 
 	// struct sockaddr_in addr;
@@ -40,36 +41,41 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_init(ChiakiStopPipe *stop_pipe)
 	bind(stop_pipe->fd, (struct sockaddr *) &stop_pipe->addr, addr_size);
 	// listen
 	getsockname(stop_pipe->fd, (struct sockaddr *) &stop_pipe->addr, &addr_size);
+	#ifdef __PSVITA__
+	int nbio = 1;
+	int r = setsockopt(stop_pipe->fd, SOL_SOCKET, SO_NONBLOCK, &nbio, sizeof(int));
+	#else
 	int r = fcntl(stop_pipe->fd, F_SETFL, O_NONBLOCK);
+	#endif
 	if(r == -1)
 	{
 		close(stop_pipe->fd);
 		return CHIAKI_ERR_UNKNOWN;
 	}
-#elif defined(__PSVITA__)
-	int addr_size = sizeof(stop_pipe->addr);
-	stop_pipe->fd = sceNetSocket("", SCE_NET_AF_INET, SCE_NET_SOCK_DGRAM, SCE_NET_IPPROTO_UDP);
-	if (stop_pipe->fd < 0)
-		return CHIAKI_ERR_UNKNOWN;
-	stop_pipe->addr.sin_family = AF_INET;
-	stop_pipe->addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-	stop_pipe->addr.sin_port = htons(0);
-	int r = sceNetBind(stop_pipe->fd, (SceNetSockaddr *) &stop_pipe->addr, (unsigned int) addr_size);
-	if (r < 0) {
-		return CHIAKI_ERR_UNKNOWN;
-	}
-	sceNetGetsockname(stop_pipe->fd, (SceNetSockaddr *) &stop_pipe->addr, (unsigned int*) &addr_size);
-	int val = 1;
-	r = sceNetSetsockopt(stop_pipe->fd, SCE_NET_SOL_SOCKET, SCE_NET_SO_NBIO, &val, sizeof(val));
-	if(r < 0) {
-		sceNetSocketClose(stop_pipe->fd);
-		return CHIAKI_ERR_UNKNOWN;
-	}
+// #elif defined(__PSVITA__)
+// 	int addr_size = sizeof(stop_pipe->addr);
+// 	stop_pipe->fd = sceNetSocket("", SCE_NET_AF_INET, SCE_NET_SOCK_DGRAM, SCE_NET_IPPROTO_UDP);
+// 	if (stop_pipe->fd < 0)
+// 		return CHIAKI_ERR_UNKNOWN;
+// 	stop_pipe->addr.sin_family = AF_INET;
+// 	stop_pipe->addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+// 	stop_pipe->addr.sin_port = htons(0);
+// 	int r = sceNetBind(stop_pipe->fd, (SceNetSockaddr *) &stop_pipe->addr, (unsigned int) addr_size);
+// 	if (r < 0) {
+// 		return CHIAKI_ERR_UNKNOWN;
+// 	}
+// 	sceNetGetsockname(stop_pipe->fd, (SceNetSockaddr *) &stop_pipe->addr, (unsigned int*) &addr_size);
+// 	int val = 1;
+// 	r = sceNetSetsockopt(stop_pipe->fd, SCE_NET_SOL_SOCKET, SCE_NET_SO_NBIO, &val, sizeof(val));
+// 	if(r < 0) {
+// 		sceNetSocketClose(stop_pipe->fd);
+// 		return CHIAKI_ERR_UNKNOWN;
+// 	}
 
-	stop_pipe->epoll_fd = sceNetEpollCreate("chiaki-epoll", 0);
-	if (stop_pipe->epoll_fd < 0) {
-		return CHIAKI_ERR_UNKNOWN;
-	}
+// 	stop_pipe->epoll_fd = sceNetEpollCreate("chiaki-epoll", 0);
+// 	if (stop_pipe->epoll_fd < 0) {
+// 		return CHIAKI_ERR_UNKNOWN;
+// 	}
 #else
 	int r = pipe(stop_pipe->fds);
 	if(r < 0)
@@ -92,8 +98,8 @@ CHIAKI_EXPORT void chiaki_stop_pipe_fini(ChiakiStopPipe *stop_pipe)
 #elif defined(__SWITCH__)
 	close(stop_pipe->fd);
 #elif defined(__PSVITA__)
-	sceNetSocketClose(stop_pipe->fd);
-	sceNetEpollDestroy(stop_pipe->epoll_fd);
+	close(stop_pipe->fd);
+	// sceNetEpollDestroy(stop_pipe->epoll_fd);
 #else
 	close(stop_pipe->fds[0]);
 	close(stop_pipe->fds[1]);
@@ -104,14 +110,14 @@ CHIAKI_EXPORT void chiaki_stop_pipe_stop(ChiakiStopPipe *stop_pipe)
 {
 #ifdef _WIN32
 	WSASetEvent(stop_pipe->event);
-#elif defined(__SWITCH__)
+#elif defined(__SWITCH__) || defined(__PSVITA__)
 	// send to local socket (FIXME MSG_CONFIRM)
 	sendto(stop_pipe->fd, "\x00", 1, 0,
 		(struct sockaddr*)&stop_pipe->addr, sizeof(struct sockaddr_in));
-#elif defined(__PSVITA__)
-	int r = sceNetSendto(stop_pipe->fd, "\x00", 1, 0, (SceNetSockaddr*)&stop_pipe->addr, sizeof(stop_pipe->addr));
-	if (r < 0) {
-	}
+// #elif defined(__PSVITA__)
+// 	int r = sceNetSendto(stop_pipe->fd, "\x00", 1, 0, (SceNetSockaddr*)&stop_pipe->addr, sizeof(stop_pipe->addr));
+// 	if (r < 0) {
+// 	}
 #else
 	write(stop_pipe->fds[1], "\x00", 1);
 #endif
@@ -149,48 +155,48 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_select_single(ChiakiStopPipe *sto
 		default:
 			return CHIAKI_ERR_UNKNOWN;
 	}
-#elif defined(__PSVITA__)
-	SceNetEpollEvent ev = {0};
-	ev.events = SCE_NET_EPOLLIN | SCE_NET_EPOLLHUP;
-	ev.data.fd = stop_pipe->fd;
-	int r = sceNetEpollControl(stop_pipe->epoll_fd, SCE_NET_EPOLL_CTL_ADD, stop_pipe->fd, &ev);
-	if (r < 0) {
-		return CHIAKI_ERR_UNKNOWN;
-	}
+// #elif defined(__PSVITA__)
+// 	SceNetEpollEvent ev = {0};
+// 	ev.events = SCE_NET_EPOLLIN | SCE_NET_EPOLLHUP;
+// 	ev.data.fd = stop_pipe->fd;
+// 	int r = sceNetEpollControl(stop_pipe->epoll_fd, SCE_NET_EPOLL_CTL_ADD, stop_pipe->fd, &ev);
+// 	if (r < 0) {
+// 		return CHIAKI_ERR_UNKNOWN;
+// 	}
 
-	if (!CHIAKI_SOCKET_IS_INVALID(fd)) {
-		ev.events = (write ? SCE_NET_EPOLLOUT : SCE_NET_EPOLLIN) | SCE_NET_EPOLLHUP;
-		ev.data.fd = fd;
-		r = sceNetEpollControl(stop_pipe->epoll_fd, SCE_NET_EPOLL_CTL_ADD, fd, &ev);
-		if (r < 0) {
-			return CHIAKI_ERR_UNKNOWN;
-		}
-	}
+// 	if (!CHIAKI_SOCKET_IS_INVALID(fd)) {
+// 		ev.events = (write ? SCE_NET_EPOLLOUT : SCE_NET_EPOLLIN) | SCE_NET_EPOLLHUP;
+// 		ev.data.fd = fd;
+// 		r = sceNetEpollControl(stop_pipe->epoll_fd, SCE_NET_EPOLL_CTL_ADD, fd, &ev);
+// 		if (r < 0) {
+// 			return CHIAKI_ERR_UNKNOWN;
+// 		}
+// 	}
 
-	if (r == 0) {
-		r = sceNetEpollWait(stop_pipe->epoll_fd, &ev, 1, timeout_ms * 1000);
-	}
+// 	if (r == 0) {
+// 		r = sceNetEpollWait(stop_pipe->epoll_fd, &ev, 1, timeout_ms * 1000);
+// 	}
 
-	sceNetEpollControl(stop_pipe->epoll_fd, SCE_NET_EPOLL_CTL_DEL, stop_pipe->fd, NULL);
-	if (!CHIAKI_SOCKET_IS_INVALID(fd)) {
-		sceNetEpollControl(stop_pipe->epoll_fd, SCE_NET_EPOLL_CTL_DEL, fd, NULL);
-	}
+// 	sceNetEpollControl(stop_pipe->epoll_fd, SCE_NET_EPOLL_CTL_DEL, stop_pipe->fd, NULL);
+// 	if (!CHIAKI_SOCKET_IS_INVALID(fd)) {
+// 		sceNetEpollControl(stop_pipe->epoll_fd, SCE_NET_EPOLL_CTL_DEL, fd, NULL);
+// 	}
 
-	if(r < 0) {
-		return CHIAKI_ERR_UNKNOWN;
-	}
+// 	if(r < 0) {
+// 		return CHIAKI_ERR_UNKNOWN;
+// 	}
 
-	if (ev.data.fd == stop_pipe->fd) {
-		return CHIAKI_ERR_CANCELED;
-	} else if (ev.data.fd == fd) {
-		return CHIAKI_ERR_SUCCESS;
-	}
+// 	if (ev.data.fd == stop_pipe->fd) {
+// 		return CHIAKI_ERR_CANCELED;
+// 	} else if (ev.data.fd == fd) {
+// 		return CHIAKI_ERR_SUCCESS;
+// 	}
 
-	return CHIAKI_ERR_TIMEOUT;
+// 	return CHIAKI_ERR_TIMEOUT;
 #else
 	fd_set rfds;
 	FD_ZERO(&rfds);
-#if defined(__SWITCH__)
+#if defined(__SWITCH__) || defined(__PSVITA__)
 	// push udp local socket as fd
 	int stop_fd = stop_pipe->fd;
 #else
@@ -218,6 +224,15 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_select_single(ChiakiStopPipe *sto
 		timeout_s.tv_usec = (timeout_ms % 1000) * 1000;
 		timeout = &timeout_s;
 	}
+	#ifdef __PSVITA__
+	// workaround crash in newlib
+	else {
+		timeout_s.tv_sec = 999999999;
+		timeout_s.tv_usec = 0;
+		timeout = &timeout_s;
+	}
+	#endif
+	
 	int r = select(nfds, &rfds, write ? &wfds : NULL, NULL, timeout);
 
 	if(r < 0)
@@ -235,12 +250,12 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_select_single(ChiakiStopPipe *sto
 
 CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_connect(ChiakiStopPipe *stop_pipe, chiaki_socket_t fd, struct sockaddr *addr, size_t addrlen)
 {
-	#ifdef __PSVITA__
-	int r = sceNetConnect(fd, (SceNetSockaddr*) addr, addrlen);
-	int errno = r;
-	#else
+	// #ifdef __PSVITA__
+	// int r = sceNetConnect(fd, (SceNetSockaddr*) addr, addrlen);
+	// int errno = r;
+	// #else
 	int r = connect(fd, addr, (socklen_t)addrlen);
-	#endif
+	// #endif
 	if(r >= 0)
 		return CHIAKI_ERR_SUCCESS;
 
@@ -258,11 +273,12 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_connect(ChiakiStopPipe *stop_pipe
 			return CHIAKI_ERR_CONNECTION_REFUSED;
 		else
 			return CHIAKI_ERR_NETWORK;
-#elif defined(__PSVITA__)
-	if (r == SCE_NET_ERROR_ECONNREFUSED)
-			return CHIAKI_ERR_CONNECTION_REFUSED;
-	else
-		return CHIAKI_ERR_NETWORK;
+// #elif defined(__PSVITA__)
+// 	if (r == SCE_NET_ERROR_ECONNREFUSED)
+// 			return CHIAKI_ERR_CONNECTION_REFUSED;
+// 	else {
+// 		return CHIAKI_ERR_NETWORK;
+// 	}
 #else
 		if(errno == ECONNREFUSED)
 			return CHIAKI_ERR_CONNECTION_REFUSED;
@@ -276,27 +292,28 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_connect(ChiakiStopPipe *stop_pipe
 	if(getpeername(fd, &peer, &peerlen) == 0)
 		return CHIAKI_ERR_SUCCESS;
 
-	#ifdef __PSVITA__
-	if (r == SCE_NET_ERROR_ENOTCONN)
-	#else
-	if(errno != ENOTCONN)
-	#endif
+	// #ifdef __PSVITA__
+	// if (errno == SCE_NET_ERROR_ENOTCONN) {
+	// #else
+	if(errno != ENOTCONN) {
+	// #endif
 		return CHIAKI_ERR_UNKNOWN;
+	}
 
 #ifdef _WIN32
 	DWORD sockerr;
 #else
 	int sockerr;
 #endif
-#ifdef __PSVITA__
-	socklen_t sockerr_sz = sizeof(sockerr);
-	if(sceNetGetsockopt(fd, SCE_NET_SOL_SOCKET, SCE_NET_SO_ERROR, &sockerr, &sockerr_sz) < 0)
-		return CHIAKI_ERR_UNKNOWN;
-#else
+// #ifdef __PSVITA__
+// 	socklen_t sockerr_sz = sizeof(sockerr);
+// 	if(sceNetGetsockopt(fd, SCE_NET_SOL_SOCKET, SCE_NET_SO_ERROR, &sockerr, &sockerr_sz) < 0)
+// 		return CHIAKI_ERR_UNKNOWN;
+// #else
 	socklen_t sockerr_sz = sizeof(sockerr);
 	if(getsockopt(fd, SOL_SOCKET, SO_ERROR, &sockerr, &sockerr_sz) < 0)
 		return CHIAKI_ERR_UNKNOWN;
-#endif
+// #endif
 
 #ifdef _WIN32
 	switch(sockerr)
@@ -312,19 +329,21 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_connect(ChiakiStopPipe *stop_pipe
 		default:
 			return CHIAKI_ERR_UNKNOWN;
 	}
-#elif defined(__PSVITA__)
-	switch (sockerr) {
-		case SCE_NET_ERROR_ETIMEDOUT:
-			return CHIAKI_ERR_TIMEOUT;
-		case SCE_NET_ERROR_ECONNREFUSED:
-			return CHIAKI_ERR_CONNECTION_REFUSED;
-		case SCE_NET_ERROR_EHOSTDOWN:
-			return CHIAKI_ERR_HOST_DOWN;
-		case SCE_NET_ERROR_EHOSTUNREACH:
-			return CHIAKI_ERR_HOST_UNREACH;
-		default:
-			return CHIAKI_ERR_UNKNOWN;
-	}
+// #elif defined(__PSVITA__)
+// 	switch (sockerr) {
+// 		case 0:
+// 			return CHIAKI_ERR_SUCCESS; // I have no idea.
+// 		case SCE_NET_ERROR_ETIMEDOUT:
+// 			return CHIAKI_ERR_TIMEOUT;
+// 		case SCE_NET_ERROR_ECONNREFUSED:
+// 			return CHIAKI_ERR_CONNECTION_REFUSED;
+// 		case SCE_NET_ERROR_EHOSTDOWN:
+// 			return CHIAKI_ERR_HOST_DOWN;
+// 		case SCE_NET_ERROR_EHOSTUNREACH:
+// 			return CHIAKI_ERR_HOST_UNREACH;
+// 		default:
+// 			return CHIAKI_ERR_UNKNOWN;
+// 	}
 #else
 	switch(sockerr)
 	{
@@ -347,17 +366,17 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_reset(ChiakiStopPipe *stop_pipe)
 #ifdef _WIN32
 	BOOL r = WSAResetEvent(stop_pipe->event);
 	return r ? CHIAKI_ERR_SUCCESS : CHIAKI_ERR_UNKNOWN;
-#elif defined(__SWITCH__)
+#elif defined(__SWITCH__) || defined(__PSVITA__)
 	//FIXME
 	uint8_t v;
 	int r;
 	while((r = read(stop_pipe->fd, &v, sizeof(v))) > 0);
 	return r < 0 ? CHIAKI_ERR_UNKNOWN : CHIAKI_ERR_SUCCESS;
-#elif defined(__PSVITA__)
-	int r;
-	uint8_t v;
-	while((r = sceNetRecv(stop_pipe->fd, &v, sizeof(v), 0)) > 0);
-	return r < 0 ? CHIAKI_ERR_UNKNOWN : CHIAKI_ERR_SUCCESS;
+// #elif defined(__PSVITA__)
+// 	int r;
+// 	uint8_t v;
+// 	while((r = /*sceNetRecv*/read(stop_pipe->fd, &v, sizeof(v)/*, 0*/)) > 0);
+// 	return r < 0 ? CHIAKI_ERR_UNKNOWN : CHIAKI_ERR_SUCCESS;
 #else
 	uint8_t v;
 	int r;
