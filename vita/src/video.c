@@ -168,7 +168,7 @@ void update_scaling_settings(int width, int height) {
 }
 
 static int vita_pacer_thread_main(SceSize args, void *argp) {
-  // // 1s
+  // 1s
   int wait = 1000000;
   //float max_fps = 0;
   //sceDisplayGetRefreshRate(&max_fps);
@@ -373,8 +373,13 @@ int vita_h264_setup(int width, int height) {
     size_t sz = (decoder_info_out.frameMemSize + 0xFFFFF) & ~0xFFFFF;
     decoder->frameBuf.size = sz;
     LOGD("allocating size 0x%x\n", sz);
-
-    decoderblock = sceKernelAllocMemBlock("decoder", SCE_KERNEL_MEMBLOCK_TYPE_USER_MAIN_PHYCONT_NC_RW, sz, NULL);
+    SceKernelAllocMemBlockOpt *opt;
+    opt = calloc(1, sizeof(SceKernelAllocMemBlockOpt));
+    opt->size      = sizeof(SceKernelAllocMemBlockOpt);
+    opt->attr      = 4;
+    opt->alignment = 1024*1024; 
+    decoderblock = sceKernelAllocMemBlock("decoder", SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW, sz, opt);
+    // decoderblock = sceKernelAllocMemBlock("decoder", SCE_KERNEL_MEMBLOCK_TYPE_USER_MAIN_PHYCONT_NC_RW, sz, NULL);
     if (decoderblock < 0) {
       LOGD("decoderblock: 0x%08x\n", decoderblock);
       ret = VITA_VIDEO_ERROR_ALLOC_MEM;
@@ -474,6 +479,8 @@ int vita_h264_decode_frame(uint8_t *buf, size_t buf_size) {
   au.pts.lower = 0xFFFFFFFF;
   au.pts.upper = 0xFFFFFFFF;
 
+  SceInt32 avail = sceAvcdecDecodeAvailableSize(decoder);
+  LOGD("AvailableSize 0x%x BufSize 0x%x", avail, buf_size);
   int ret = 0;
   ret = sceAvcdecDecode(decoder, &au, &array_picture);
   if (ret < 0) {
