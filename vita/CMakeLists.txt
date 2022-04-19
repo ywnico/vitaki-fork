@@ -65,6 +65,7 @@ target_link_libraries(${VITA_APP_NAME}.elf
   SceNetCtl_stub
   ScePower_stub
   SceVideodec_stub
+  SceCodecEngine_stub
   SceAudio_stub
   SceIme_stub
   SceSsl_stub

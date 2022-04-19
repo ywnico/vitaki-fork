@@ -78,7 +78,7 @@ static bool video_cb(uint8_t *buf, size_t buf_size, void *user) {
   int err = vita_h264_decode_frame(buf, buf_size);
   if (err != 0) {
 		LOGE("Error during video decode: %d", err);
-    // return 1;
+    return false;
   }
   return true;
 }

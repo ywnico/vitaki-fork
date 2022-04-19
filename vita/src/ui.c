@@ -13,7 +13,6 @@
 #include "host.h"
 #include "ui.h"
 #include "util.h"
-#include "video.h"
 
 #define COLOR_WHITE RGBA8(255, 255, 255, 255)
 #define COLOR_BLACK RGBA8(0, 0, 0, 255)

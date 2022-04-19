@@ -46,7 +46,7 @@
 #include "discovery.h"
 #include "ui.h"
 
-static void vita_init() {
+static int vita_init() {
   // Seed OpenSSL with Sony-grade random number generator
   char random_seed[0x40] = {0};
   sceKernelGetRandomNumber(random_seed, sizeof(random_seed));
@@ -68,7 +68,8 @@ static void vita_init() {
   }
 
   SceNetInitParam param;
-  static char memory[2 * 1024 * 1024];
+  // TODO: this is insanely large
+  static char memory[8 * 1024 * 1024];
   param.memory = memory;
   param.size = sizeof(memory);
   param.flags = 0;
@@ -119,7 +120,8 @@ static void vita_init() {
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, 1);
 }
 
-// unsigned int _newlib_heap_size_user = 128 * 1024 * 1024;
+// set newlib heap size to 64mb, default is 32mb
+unsigned int _newlib_heap_size_user = 64 * 1024 * 1024;
 
 int main(int argc, char* argv[]) {
   vita_init();

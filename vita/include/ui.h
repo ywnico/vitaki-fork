@@ -1,6 +1,7 @@
 #pragma once
 #include <psp2/ctrl.h>
 #include <psp2/touch.h>
+#include <vita2d.h>
 
 typedef struct vita_chiaki_ui_state_t {
   SceTouchData touch_state_front;
