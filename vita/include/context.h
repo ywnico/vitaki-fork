@@ -3,6 +3,7 @@
 #include <psp2/kernel/processmgr.h>
 #include <chiaki/discoveryservice.h>
 #include <chiaki/log.h>
+#include <chiaki/opusdecoder.h>
 
 #include "config.h"
 #include "discovery.h"
@@ -27,6 +28,8 @@ typedef struct vita_chiaki_stream_t {
   bool session_init;
   bool is_streaming;
   int fps;
+  ChiakiOpusDecoder opus_decoder;
+  ChiakiThread input_thread;
 } VitaChiakiStream;
 
 typedef struct vita_chiaki_context_t {

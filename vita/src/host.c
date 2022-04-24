@@ -1,7 +1,10 @@
 #include "context.h"
 #include "host.h"
+#include "audio.h"
 #include "video.h"
 #include "string.h"
+#include <psp2/ctrl.h>
+#include <chiaki/session.h>
 
 void host_init(VitaChiakiHost* host) {
   
@@ -27,6 +30,7 @@ static void regist_cb(ChiakiRegistEvent *event, void *user) {
   }
   chiaki_regist_stop(&regist);
 	chiaki_regist_fini(&regist);
+	chiaki_opus_decoder_fini(&context.stream.opus_decoder);
 }
 
 int host_register(VitaChiakiHost* host, int pin) {
@@ -83,16 +87,61 @@ static bool video_cb(uint8_t *buf, size_t buf_size, void *user) {
   return true;
 }
 
+static int input_thread_func(void* user) {
+  sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG_WIDE);
+  sceCtrlSetSamplingModeExt(SCE_CTRL_MODE_ANALOG_WIDE);
+  SceCtrlData ctrl;
+	VitaChiakiStream *stream = user;
+  while (true) {
+    if (stream->is_streaming) {
+      sceCtrlPeekBufferPositiveExt2(0, &ctrl, 1);
+      // 0-255 conversion
+      stream->controller_state.left_x = (ctrl.lx - 128) * 2 * 0x7F/*.FF*/;
+      stream->controller_state.left_y = (ctrl.ly - 128) * 2 * 0x7F/*.FF*/;
+      stream->controller_state.right_x = (ctrl.rx - 128) * 2 * 0x7F/*.FF*/;
+      stream->controller_state.right_y = (ctrl.ry - 128) * 2 * 0x7F/*.FF*/;
+      stream->controller_state.buttons = 0x00;
+      // cursed conversion
+      if (ctrl.buttons & SCE_CTRL_SELECT) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_SHARE;
+      if (ctrl.buttons & SCE_CTRL_L3) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_L3;
+      if (ctrl.buttons & SCE_CTRL_R3) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_R3;
+      if (ctrl.buttons & SCE_CTRL_START) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_OPTIONS;
+      if (ctrl.buttons & SCE_CTRL_UP) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_DPAD_UP;
+      if (ctrl.buttons & SCE_CTRL_RIGHT) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_DPAD_RIGHT;
+      if (ctrl.buttons & SCE_CTRL_DOWN) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_DPAD_DOWN;
+      if (ctrl.buttons & SCE_CTRL_LEFT) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_DPAD_LEFT;
+      if (ctrl.buttons & SCE_CTRL_L1) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_L1;
+      if (ctrl.buttons & SCE_CTRL_R1) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_R1;
+      if (ctrl.buttons & SCE_CTRL_TRIANGLE) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_PYRAMID;
+      if (ctrl.buttons & SCE_CTRL_CIRCLE) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_MOON;
+      if (ctrl.buttons & SCE_CTRL_CROSS) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_CROSS;
+      if (ctrl.buttons & SCE_CTRL_SQUARE) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_BOX;
+      if ((ctrl.buttons & SCE_CTRL_SELECT) && (ctrl.buttons & SCE_CTRL_START)) {
+        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_SHARE;
+        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_OPTIONS;
+        stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_PS;
+      }
+
+      chiaki_session_set_controller_state(&stream->session, &stream->controller_state);
+      // LOGD("ly 0x%x %d", ctrl.ly, ctrl.ly);
+      usleep(5000); // 5 ms
+    }
+  }
+
+  return 0;
+}
+
 int host_stream(VitaChiakiHost* host) {
   if (!host->hostname || !host->registered_state) {
     return 1;
   }
   ChiakiConnectVideoProfile profile = {};
 	chiaki_connect_video_profile_preset(&profile,
-		CHIAKI_VIDEO_RESOLUTION_PRESET_540p, CHIAKI_VIDEO_FPS_PRESET_30);
+		context.config.resolution, context.config.fps);
+  // profile.bitrate = 10000;
 	// Build chiaki ps4 stream session
-	// chiaki_opus_decoder_init(&(this->opus_decoder), this->log);
-	// ChiakiAudioSink audio_sink;
+	ChiakiAudioSink audio_sink;
+	chiaki_opus_decoder_init(&context.stream.opus_decoder, &context.log);
 	ChiakiConnectInfo chiaki_connect_info = {};
 
 	chiaki_connect_info.host = host->hostname;
@@ -111,17 +160,16 @@ int host_stream(VitaChiakiHost* host) {
   }
 	context.stream.session_init = true;
 	// audio setting_cb and frame_cb
-	// chiaki_opus_decoder_set_cb(&this->opus_decoder, InitAudioCB, AudioCB, user);
-	// chiaki_opus_decoder_get_sink(&this->opus_decoder, &audio_sink);
-	// chiaki_session_set_audio_sink(&this->session, &audio_sink);
+	chiaki_opus_decoder_set_cb(&context.stream.opus_decoder, vita_audio_init, vita_audio_cb, NULL);
+	chiaki_opus_decoder_get_sink(&context.stream.opus_decoder, &audio_sink);
+	chiaki_session_set_audio_sink(&context.stream.session, &audio_sink);
   chiaki_session_set_video_sample_cb(&context.stream.session, video_cb, NULL);
 	chiaki_session_set_event_cb(&context.stream.session, event_cb, NULL);
 
 	// init controller states
 	chiaki_controller_state_set_idle(&context.stream.controller_state);
 
-
-  err = vita_h264_setup(960, 540);
+  err = vita_h264_setup(profile.width, profile.height);
   if (err != 0) {
 		LOGE("Error during video start: %d", err);
     return 1;
@@ -133,6 +181,12 @@ int host_stream(VitaChiakiHost* host) {
 		LOGE("Error during stream start: %s", chiaki_error_string(err));
     return 1;
   }
+
+	err = chiaki_thread_create(&context.stream.input_thread, input_thread_func, &context.stream);
+	if(err != CHIAKI_ERR_SUCCESS)
+	{
+		LOGE("Failed to create input thread");
+	}
   return 0;
 }
 

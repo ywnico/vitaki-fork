@@ -68,8 +68,8 @@ static int vita_init() {
   }
 
   SceNetInitParam param;
-  // TODO: this is insanely large
-  static char memory[8 * 1024 * 1024];
+  // TODO: this is probably way too large
+  static char memory[4 * 1024 * 1024];
   param.memory = memory;
   param.size = sizeof(memory);
   param.flags = 0;

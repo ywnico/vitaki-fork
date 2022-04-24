@@ -22,7 +22,7 @@ build_chiaki (){
 			-DCHIAKI_ENABLE_FFMPEG_DECODER=OFF \
 			-DCHIAKI_ENABLE_PI_DECODER=OFF \
 			-DCHIAKI_USE_SYSTEM_NANOPB=OFF \
-			-DCHIAKI_LIB_ENABLE_OPUS=OFF
+			-DCHIAKI_LIB_ENABLE_OPUS=ON
 	# fi
 	make -j$(nproc) -C "./build"
 	python3 ./scripts/vita/devtool.py --host $PSVITAIP upload

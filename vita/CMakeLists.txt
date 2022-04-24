@@ -14,9 +14,12 @@ add_executable(${VITA_APP_NAME}.elf
     src/util.c
     src/host.c
     src/video.c
+    src/audio.c
 
     third_party/tomlc99/toml.c
-    # src/lib/ime.c
+    third_party/h264-bitstream/h264_nal.c
+	third_party/h264-bitstream/h264_sei.c
+	third_party/h264-bitstream/h264_stream.c
 )
 
 
@@ -27,6 +30,7 @@ target_compile_definitions(${VITA_APP_NAME}.elf PUBLIC
 target_include_directories(${VITA_APP_NAME}.elf PRIVATE
     include
     third_party
+    third_party/h264-bitstream/
 )
 
 target_link_libraries(${VITA_APP_NAME}.elf
