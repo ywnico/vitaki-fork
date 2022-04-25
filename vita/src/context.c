@@ -37,10 +37,10 @@ bool vita_chiaki_init_context() {
   context.config.auto_discovery = true;
   context.config.disconnect_action = DISCONNECT_ACTION_ASK;
   context.config.resolution = CHIAKI_VIDEO_RESOLUTION_PRESET_540p;
-  context.config.fps = CHIAKI_VIDEO_FPS_PRESET_30;
+  context.config.fps = CHIAKI_VIDEO_FPS_PRESET_60;
 
   // TODO: Load log level from config
   // TODO: Custom logging callback that logs to a file
-  chiaki_log_init(&(context.log), CHIAKI_LOG_ALL, &log_cb_debugnet, NULL);
+  chiaki_log_init(&(context.log), CHIAKI_LOG_ALL & ~(CHIAKI_LOG_VERBOSE | CHIAKI_LOG_DEBUG), &log_cb_debugnet, NULL);
   return true;
 }
