@@ -1,9 +1,12 @@
 #include "context.h"
+#include "config.h"
 #include "host.h"
 #include "audio.h"
 #include "video.h"
 #include "string.h"
+#include <stdio.h>
 #include <psp2/ctrl.h>
+#include <chiaki/base64.h>
 #include <chiaki/session.h>
 
 void host_init(VitaChiakiHost* host) {
@@ -25,12 +28,38 @@ ChiakiRegist regist = {};
 static void regist_cb(ChiakiRegistEvent *event, void *user) {
   LOGD("regist event %d", event->type);
   if (event->type == CHIAKI_REGIST_EVENT_TYPE_FINISHED_SUCCESS) {
-    context.active_host->registered_state = event->registered_host;
     context.active_host->type |= REGISTERED;
+
+    if (context.active_host->registered_state != NULL) {
+      free(context.active_host->registered_state);
+      context.active_host->registered_state = event->registered_host;
+      printf("FOUND HOST TO UPDATE\n");
+      for (int rhost_idx = 0; rhost_idx < context.config.num_registered_hosts; rhost_idx++) {
+        VitaChiakiHost* rhost =
+            context.config.registered_hosts[rhost_idx];
+        if (rhost == NULL) {
+          continue;
+        }
+
+        // FIXME: Use MAC instead of name
+        printf("NAME1 %s\n", rhost->registered_state->server_nickname);
+        printf("NAME2 %s\n", context.active_host->registered_state->server_nickname);
+        if (strcmp(rhost->registered_state->server_nickname, context.active_host->registered_state->server_nickname) == 0) {
+          printf("FOUND MATCH\n");
+          context.config.registered_hosts[rhost_idx] = context.active_host;
+          break;
+        }
+      }
+    } else {
+      context.active_host->registered_state = event->registered_host;
+      context.config.registered_hosts[context.config.num_registered_hosts++] = context.active_host;
+    }
+
+    config_serialize(&context.config);
   }
+
   chiaki_regist_stop(&regist);
 	chiaki_regist_fini(&regist);
-	chiaki_opus_decoder_fini(&context.stream.opus_decoder);
 }
 
 int host_register(VitaChiakiHost* host, int pin) {
@@ -53,7 +82,7 @@ int host_wakeup(VitaChiakiHost* host) {
   if (!host->hostname || !host->discovery_state) {
     return 1;
   }
-  // TODO: Wake up host
+  chiaki_discovery_wakeup(&context.log, context.discovery_enabled ? &context.discovery.discovery : NULL, host->hostname, *host->registered_state->rp_regist_key, chiaki_target_is_ps5(host->target));
   return 0;
 }
 
@@ -71,6 +100,7 @@ static void event_cb(ChiakiEvent *event, void *user) {
 			break;
 		case CHIAKI_EVENT_QUIT:
 			LOGE("EventCB CHIAKI_EVENT_QUIT");
+	    chiaki_opus_decoder_fini(&context.stream.opus_decoder);
       vita_h264_cleanup();
       context.stream.is_streaming = false;
 			break;
@@ -87,7 +117,7 @@ static bool video_cb(uint8_t *buf, size_t buf_size, void *user) {
   return true;
 }
 
-static int input_thread_func(void* user) {
+static void *input_thread_func(void* user) {
   sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG_WIDE);
   sceCtrlSetSamplingModeExt(SCE_CTRL_MODE_ANALOG_WIDE);
   SceCtrlData ctrl;
@@ -138,7 +168,7 @@ int host_stream(VitaChiakiHost* host) {
   ChiakiConnectVideoProfile profile = {};
 	chiaki_connect_video_profile_preset(&profile,
 		context.config.resolution, context.config.fps);
-  // profile.bitrate = 10000;
+  // profile.bitrate = 12000;
 	// Build chiaki ps4 stream session
 	ChiakiAudioSink audio_sink;
 	chiaki_opus_decoder_init(&context.stream.opus_decoder, &context.log);
@@ -193,7 +223,7 @@ int host_stream(VitaChiakiHost* host) {
 /// Check if two MAC addresses match
 bool mac_addrs_match(MacAddr* a, MacAddr* b) {
   for (int j = 0; j < 6; j++) {
-    if (a[j] != b[j]) {
+    if ((*a)[j] != (*b)[j]) {
       return false;
     }
   }

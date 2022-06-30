@@ -5,6 +5,7 @@
 #include "host.h"
 
 #define CFG_VERSION 1
+#define CFG_FILENAME "ux0:data/vita-chiaki/chiaki.toml"
 
 /// Action to perform after terminating a session
 typedef enum vita_chiaki_disconnect_action_t {
@@ -31,6 +32,6 @@ typedef struct vita_chiaki_config_t {
   // TODO: Loglevel
 } VitaChiakiConfig;
 
-VitaChiakiConfig* config_parse(char* filename);
+void config_parse(VitaChiakiConfig* cfg);
 void config_free(VitaChiakiConfig* cfg);
-void config_serialize(char* filename, VitaChiakiConfig* cfg);
+void config_serialize(VitaChiakiConfig* cfg);

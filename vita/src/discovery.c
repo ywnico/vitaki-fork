@@ -62,13 +62,20 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
 
   // Check if the newly discovered host is a known registered one
   for (int rhost_idx = 0; rhost_idx < context.config.num_registered_hosts; rhost_idx++) {
-    ChiakiRegisteredHost* rhost =
-        context.config.registered_hosts[rhost_idx]->registered_state;
+    VitaChiakiHost* rhost =
+        context.config.registered_hosts[rhost_idx];
     if (rhost == NULL) {
       continue;
     }
-    if (mac_addrs_match(&(rhost->server_mac), &(h->server_mac))) {
-      h->registered_state = rhost;
+
+    // FIXME: Use MAC instead of name
+    printf("FOUND HOST\n");
+    printf("NAME1 %s\n", rhost->registered_state->server_nickname);
+    printf("NAME2 %s\n", h->discovery_state->host_name);
+    if (strcmp(rhost->registered_state->server_nickname, h->discovery_state->host_name) == 0) {
+      printf("FOUND MATCH\n");
+      h->registered_state = rhost->registered_state;
+      h->type |= REGISTERED;
       break;
     }
   }

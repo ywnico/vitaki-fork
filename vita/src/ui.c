@@ -168,7 +168,7 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
   }
 
   // Draw host address
-  vita2d_font_draw_text(font, x + 260, y + 44, COLOR_WHITE, 20, host->hostname);
+  vita2d_font_draw_text(font, x + 260, y + HOST_SLOT_H - 10, COLOR_WHITE, 20, host->hostname);
 
   vita2d_texture* console_img;
   bool is_ps5 = chiaki_target_is_ps5(host->target);
@@ -197,7 +197,9 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
   int old_btn = context.ui_state.old_button_state;
   int last_slot = context.num_hosts - 1;
   if (is_active) {
-    if (context.active_host != host) context.active_host = host;
+    if (context.active_host != host) {
+      context.active_host = host;
+    }
     if (btn_pressed(SCE_CTRL_UP)) {
       if (host_slot < 2) {
         // Set focus on the last button of the header bar
@@ -226,6 +228,28 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
       }
     }
     // Determine action to perform
+    // if (btn_pressed(SCE_CTRL_CROSS) && !registered) {
+    //   for (int i = 0; i < context.config.num_registered_hosts; i++) {
+    //     printf("0x%x", context.config.registered_hosts[i]->registered_state);
+    //     if (context.config.registered_hosts[i] != NULL && strcmp(context.active_host->hostname, context.config.registered_hosts[i]->hostname) == 0) {
+    //       context.active_host->registered_state = context.config.registered_hosts[i]->registered_state;
+    //       context.active_host->type |= REGISTERED;
+    //       registered = true;
+    //       break;
+    //     }
+    //   }
+    // }
+    // if (btn_pressed(SCE_CTRL_CROSS) && !registered && !added) {
+    //   for (int i = 0; i < context.config.num_manual_hosts; i++) {
+    //     if (context.config.manual_hosts[i] != NULL && strcmp(context.active_host->hostname, context.config.manual_hosts[i]->hostname) == 0) {
+    //       context.active_host->registered_state = context.config.manual_hosts[i]->registered_state;
+    //       context.active_host->type |= MANUALLY_ADDED;
+    //       context.active_host->type |= REGISTERED;
+    //       added = true;
+    //       break;
+    //     }
+    //   }
+    // }
     if (registered && btn_pressed(SCE_CTRL_CROSS)) {
       if (host->discovery_state->state == CHIAKI_DISCOVERY_HOST_STATE_STANDBY) {
         return UI_HOST_ACTION_WAKEUP;
@@ -446,7 +470,8 @@ UIScreenType draw_main_menu() {
   } else if (host_action == UI_HOST_ACTION_STREAM) {
     next_screen = UI_SCREEN_TYPE_STREAM;
   } else if (host_action == UI_HOST_ACTION_EDIT) {
-    next_screen = UI_SCREEN_TYPE_EDIT_HOST;
+    next_screen = UI_SCREEN_TYPE_REGISTER_HOST;
+    // next_screen = UI_SCREEN_TYPE_EDIT_HOST;
   } else if (host_action == UI_HOST_ACTION_REGISTER) {
     next_screen = UI_SCREEN_TYPE_REGISTER_HOST;
   }
@@ -484,7 +509,7 @@ bool draw_registration_dialog() {
     LINK_CODE = text;
   }
   if (btn_pressed(SCE_CTRL_CIRCLE)) {
-    host_register(context.active_host, atoi(LINK_CODE));
+    if (strlen(LINK_CODE) != 0) host_register(context.active_host, atoi(LINK_CODE));
     context.ui_state.next_active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
     // free(context.config.psn_account_id);
     // context.config.psn_account_id = NULL;

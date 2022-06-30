@@ -22,7 +22,7 @@ void vita_audio_init(unsigned int channels, unsigned int rate, void *user) {
     }
 }
 
-void vita_audio_cb(int16_t *buf, size_t samples_count) {
+void vita_audio_cb(int16_t *buf, size_t samples_count, void *user) {
     // for(int x = 0; x < samples_count * 2; x++) {
 	// 	// boost audio volume
 	// 	int sample = buf[x] * 1.80;

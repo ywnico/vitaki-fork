@@ -233,12 +233,12 @@ bool threadSetupComplete = false;
 
 void vita_h264_cleanup() {
 	if (video_status == INIT_FRAME_PACER_THREAD) {
-		active_pacer_thread = false;
-		// wait 10sec
-		SceUInt timeout = 10000000;
-		int ret;
-		sceKernelWaitThreadEnd(pacer_thread, &ret, &timeout);
-		sceKernelDeleteThread(pacer_thread);
+		// active_pacer_thread = false;
+		// // wait 10sec
+		// SceUInt timeout = 10000000;
+		// int ret;
+		// sceKernelWaitThreadEnd(pacer_thread, &ret, &timeout);
+		// sceKernelDeleteThread(pacer_thread);
 		video_status--;
 	}
 
@@ -524,15 +524,15 @@ int vita_h264_setup(int width, int height) {
 
   if (video_status == INIT_AVC_DEC) {
     // INIT_FRAME_PACER_THREAD
-    ret = sceKernelCreateThread("frame_pacer", vita_pacer_thread_main, 0, 4 * 1024, 0, 0, NULL);
-    if (ret < 0) {
-      LOGD("sceKernelCreateThread 0x%x\n", ret);
-      ret = VITA_VIDEO_ERROR_CREATE_PACER_THREAD;
-      goto cleanup;
-    }
-    pacer_thread = ret;
-    active_pacer_thread = true;
-    sceKernelStartThread(pacer_thread, 0, NULL);
+    // ret = sceKernelCreateThread("frame_pacer", vita_pacer_thread_main, 0, 4 * 1024, 0, 0, NULL);
+    // if (ret < 0) {
+    //   LOGD("sceKernelCreateThread 0x%x\n", ret);
+    //   ret = VITA_VIDEO_ERROR_CREATE_PACER_THREAD;
+    //   goto cleanup;
+    // }
+    // pacer_thread = ret;
+    // active_pacer_thread = true;
+    // sceKernelStartThread(pacer_thread, 0, NULL);
     video_status++;
   }
 
@@ -707,7 +707,7 @@ int vita_h264_decode_frame(uint8_t *buf, size_t buf_size) {
     vita_h264_process_header(buf, buf_size);
     // header_buf = buf;
     // header_buf_size = buf_size;
-    hexdump(buf, buf_size);
+    // hexdump(buf, buf_size);
 
     // chiaki_mutex_unlock(&mtx);
     // return 0;
@@ -814,7 +814,7 @@ int vita_h264_decode_frame(uint8_t *buf, size_t buf_size) {
       vita2d_start_drawing();
 
       draw_streaming(frame_texture);
-      draw_fps();
+      // draw_fps();
       draw_indicators();
 
       vita2d_end_drawing();
