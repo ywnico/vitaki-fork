@@ -28,6 +28,7 @@
 #define ROUND_NEAREST_16(x)                     (round(((double) (x)) / 16) * 16)
 #define VITA_DECODER_RESOLUTION_LOWER_BOUND(x)  ((x) < 64 ? 64 : (x))
 #define VITA_DECODER_RESOLUTION(x)              (VITA_DECODER_RESOLUTION_LOWER_BOUND(ROUND_NEAREST_16(x)))
+#define REF_FRAMES 8
 
 void vita_h264_start();
 void vita_h264_stop();

@@ -397,7 +397,7 @@ int vita_h264_setup(int width, int height) {
 		initVideodec.hwAvc.horizontal = VITA_DECODER_RESOLUTION(width);
 		initVideodec.hwAvc.vertical = VITA_DECODER_RESOLUTION(height);
 		initVideodec.hwAvc.numOfStreams = 1;
-		initVideodec.hwAvc.numOfRefFrames = 5;
+		initVideodec.hwAvc.numOfRefFrames = REF_FRAMES;
 
 		ret = sceVideodecQueryMemSize(SCE_VIDEODEC_TYPE_HW_AVCDEC, &initVideodec, &libMemInfo);
 		if (ret < 0) {
@@ -617,7 +617,7 @@ bool vita_h264_process_header(uint8_t *data, size_t data_len) {
         return false;
       }
       // h->nal->nal_unit_type = NAL_UNIT_TYPE_SPS;
-      h->sps->num_ref_frames = 5;
+      h->sps->num_ref_frames = REF_FRAMES;
       // h->sps->level_idc = 32; // Max 5 buffered frames at 1280x720x60
       // h->sps->vui.bitstream_restriction_flag = 1;
       // h->sps->vui.max_bits_per_mb_denom = 1;
@@ -650,7 +650,7 @@ bool vita_h264_process_header(uint8_t *data, size_t data_len) {
       // h->sps->vui.chroma_loc_info_present_flag = 0;
 
       // // Some devices throw errors if max_dec_frame_buffering < num_ref_frames
-      h->sps->vui.max_dec_frame_buffering = 5;
+      h->sps->vui.max_dec_frame_buffering = REF_FRAMES;
 
       // // These values are the default for the fields, but they are more aggressive
       // // than what GFE sends in 2.5.11, but it doesn't seem to cause picture problems.

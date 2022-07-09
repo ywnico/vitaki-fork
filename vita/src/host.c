@@ -170,7 +170,7 @@ int host_stream(VitaChiakiHost* host) {
   ChiakiConnectVideoProfile profile = {};
 	chiaki_connect_video_profile_preset(&profile,
 		context.config.resolution, context.config.fps);
-  profile.bitrate = 15000;
+  // profile.bitrate = 15000;
 	// Build chiaki ps4 stream session
 	ChiakiAudioSink audio_sink;
 	chiaki_opus_decoder_init(&context.stream.opus_decoder, &context.log);
