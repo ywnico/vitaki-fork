@@ -1,6 +1,7 @@
 #include <sys/param.h>
 #include <string.h>
 #include <tomlc99/toml.h>
+#include <chiaki/base64.h>
 
 #include "config.h"
 #include "context.h"
@@ -121,7 +122,7 @@ void config_parse(VitaChiakiConfig* cfg) {
         toml_table_t* host_cfg = toml_table_at(regist_hosts, i);
         datum = toml_string_in(host_cfg, "server_mac");
         if (datum.ok) {
-          parse_hex(datum.u.s, host->server_mac, 6);
+          parse_b64(datum.u.s, host->server_mac, 6);
           printf("MAC %X%X%X%X%X%X\n", host->server_mac[0], host->server_mac[1], host->server_mac[2],
                           host->server_mac[3], host->server_mac[4], host->server_mac[5]);
           free(datum.u.s);
@@ -139,7 +140,9 @@ void config_parse(VitaChiakiConfig* cfg) {
         }
         datum = toml_string_in(host_cfg, "rp_key");
         if (datum.ok) {
-          parse_hex(datum.u.s, rstate->rp_key, 0x10);
+          printf("after rp %s\n", datum.u.s);
+          parse_b64(datum.u.s, rstate->rp_key, 0x10);
+          hexdump(rstate->rp_key, (size_t)0x10);
           free(datum.u.s);
         }
         datum = toml_int_in(host_cfg, "rp_key_type");
@@ -152,30 +155,30 @@ void config_parse(VitaChiakiConfig* cfg) {
           zero_pad(rstate->rp_regist_key, sizeof(rstate->rp_regist_key));
           free(datum.u.s);
         }
-        datum = toml_string_in(host_cfg, "ap_bssid");
-        if (datum.ok) {
-          strncpy(rstate->ap_bssid, datum.u.s, sizeof(rstate->ap_bssid));
-          zero_pad(rstate->ap_bssid, sizeof(rstate->ap_bssid));
-          free(datum.u.s);
-        }
-        datum = toml_string_in(host_cfg, "ap_key");
-        if (datum.ok) {
-          strncpy(rstate->ap_key, datum.u.s, sizeof(rstate->ap_key));
-          zero_pad(rstate->ap_bssid, sizeof(rstate->ap_bssid));
-          free(datum.u.s);
-        }
-        datum = toml_string_in(host_cfg, "ap_ssid");
-        if (datum.ok) {
-          strncpy(rstate->ap_ssid, datum.u.s, sizeof(rstate->ap_ssid));
-          zero_pad(rstate->ap_ssid, sizeof(rstate->ap_ssid));
-          free(datum.u.s);
-        }
-        datum = toml_string_in(host_cfg, "ap_name");
-        if (datum.ok) {
-          strncpy(rstate->ap_name, datum.u.s, sizeof(rstate->ap_name));
-          zero_pad(rstate->ap_name, sizeof(rstate->ap_name));
-          free(datum.u.s);
-        }
+        // datum = toml_string_in(host_cfg, "ap_bssid");
+        // if (datum.ok) {
+        //   strncpy(rstate->ap_bssid, datum.u.s, sizeof(rstate->ap_bssid));
+        //   zero_pad(rstate->ap_bssid, sizeof(rstate->ap_bssid));
+        //   free(datum.u.s);
+        // }
+        // datum = toml_string_in(host_cfg, "ap_key");
+        // if (datum.ok) {
+        //   strncpy(rstate->ap_key, datum.u.s, sizeof(rstate->ap_key));
+        //   zero_pad(rstate->ap_key, sizeof(rstate->ap_key));
+        //   free(datum.u.s);
+        // }
+        // datum = toml_string_in(host_cfg, "ap_ssid");
+        // if (datum.ok) {
+        //   strncpy(rstate->ap_ssid, datum.u.s, sizeof(rstate->ap_ssid));
+        //   zero_pad(rstate->ap_ssid, sizeof(rstate->ap_ssid));
+        //   free(datum.u.s);
+        // }
+        // datum = toml_string_in(host_cfg, "ap_name");
+        // if (datum.ok) {
+        //   strncpy(rstate->ap_name, datum.u.s, sizeof(rstate->ap_name));
+        //   zero_pad(rstate->ap_name, sizeof(rstate->ap_name));
+        //   free(datum.u.s);
+        // }
         cfg->registered_hosts[i] = host;
         cfg->num_registered_hosts++;
       }
@@ -192,7 +195,7 @@ void config_parse(VitaChiakiConfig* cfg) {
         if (datum.ok) {
           // We have a MAC for the manual host, try to find corresponding
           // registered host
-          parse_hex(datum.u.s, server_mac, sizeof(server_mac));
+          parse_b64(datum.u.s, server_mac, sizeof(server_mac));
           free(datum.u.s);
           for (int hidx=0; hidx < cfg->num_registered_hosts; hidx++) {
             uint8_t* candidate_mac = cfg->registered_hosts[hidx]->server_mac;
@@ -265,7 +268,7 @@ char* serialize_resolution_preset(ChiakiVideoResolutionPreset preset) {
   }
 }
 
-void serialize_hex(FILE* fp, char* field_name, uint8_t* val, size_t len) {
+void serialize_b64(FILE* fp, char* field_name, uint8_t* val, size_t len) {
   bool all_zero = true;
   for (size_t i=0; i < len; i++) {
     if (val[i] != 0) {
@@ -277,10 +280,13 @@ void serialize_hex(FILE* fp, char* field_name, uint8_t* val, size_t len) {
     return;
   }
   fprintf(fp, "%s = \"", field_name);
-  for (size_t i=0; i < len; i++) {
-    fprintf(fp, "%02X", val[i]);
-  }
-  fprintf(fp, "\"\n");
+  // for (size_t i=0; i < len; i++) {
+  //   fprintf(fp, "%02X", val[i]);
+  // }
+  char b64[get_base64_size(len) + 1];
+  memset(b64, 0, get_base64_size(len) + 1);
+  chiaki_base64_encode(val, len, b64, get_base64_size(len));
+  fprintf(fp, "%s\"\n", b64);
 }
 
 void serialize_target(FILE* fp, char* field_name, ChiakiTarget* target) {
@@ -337,23 +343,23 @@ void config_serialize(VitaChiakiConfig* cfg) {
       }
     }
     if (mac) {
-      serialize_hex(fp, "server_mac", mac, 6);
+      serialize_b64(fp, "server_mac", mac, 6);
     }
   }
 
   for (int i = 0; i < cfg->num_registered_hosts; i++) {
     ChiakiRegisteredHost* rhost = cfg->registered_hosts[i]->registered_state;
     fprintf(fp, "\n\n[[registered_hosts]]\n");
-    serialize_hex(fp, "server_mac", rhost->server_mac, 6);
+    serialize_b64(fp, "server_mac", rhost->server_mac, 6);
     fprintf(fp, "server_nickname = \"%s\"\n", rhost->server_nickname);
     serialize_target(fp, "target", &rhost->target);
-    serialize_hex(fp, "rp_key", &(rhost->rp_key[0]), 0x10);
+    serialize_b64(fp, "rp_key", rhost->rp_key, 0x10);
     fprintf(fp, "rp_key_type = %d\n", rhost->rp_key_type);
     fprintf(fp, "rp_regist_key = \"%s\"\n", rhost->rp_regist_key);
-    fprintf(fp, "ap_bssid = \"%s\"\n", rhost->ap_bssid);
-    fprintf(fp, "ap_key = \"%s\"\n", rhost->ap_key);
-    fprintf(fp, "ap_ssid = \"%s\"\n", rhost->ap_ssid);
-    fprintf(fp, "ap_name = \"%s\"\n", rhost->ap_name);
+    // fprintf(fp, "ap_bssid = \"%s\"\n", rhost->ap_bssid);
+    // fprintf(fp, "ap_key = \"%s\"\n", rhost->ap_key);
+    // fprintf(fp, "ap_ssid = \"%s\"\n", rhost->ap_ssid);
+    // fprintf(fp, "ap_name = \"%s\"\n", rhost->ap_name);
   }
   fclose(fp);
 }

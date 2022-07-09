@@ -467,6 +467,8 @@ UIScreenType draw_main_menu() {
   if (host_slots == 0) {
     // TODO: Draw a "Please add a host via the header bar" message
     //       in the center of the screen, maybe with a nice little arrow image?
+  } else if (host_action == UI_HOST_ACTION_WAKEUP) {
+    host_wakeup(context.active_host);
   } else if (host_action == UI_HOST_ACTION_STREAM) {
     next_screen = UI_SCREEN_TYPE_STREAM;
   } else if (host_action == UI_HOST_ACTION_EDIT) {

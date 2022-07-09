@@ -1,11 +1,16 @@
 #include <stdio.h>
+#include <chiaki/base64.h>
 #include "util.h"
 
-void parse_hex(const char* val, uint8_t* dest, size_t len) {
-  for (size_t i=0; i < len; i++) {
-    sscanf(val+(i*2), "%02hhx", &(dest[i]));
-  }
+void parse_b64(const char* val, uint8_t* dest, size_t len) {
+  chiaki_base64_decode(val, get_base64_size(len), dest, &len);
 }
+
+// void parse_b64(const char* val, uint8_t* dest, size_t len) {
+//   for (size_t i=0; i < len; i++) {
+//     sscanf(val+(i*2), "%02hhx", &(dest[i]));
+//   }
+// }
 
 /*
   VitaShell

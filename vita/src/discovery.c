@@ -16,7 +16,7 @@
 void save_discovered_host(ChiakiDiscoveryHost* host) {
   // Check if the host is already known, and if not, locate a free spot for it
   uint8_t host_mac[6];
-  parse_hex(host->host_id, host_mac, sizeof(host_mac));
+  parse_b64(host->host_id, host_mac, sizeof(host_mac));
   int target_idx = -1;
   VitaChiakiHost* h;
   for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {

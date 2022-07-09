@@ -3,7 +3,7 @@
 #include <inttypes.h>
 #include <sys/types.h>
 
-void parse_hex(const char* val, uint8_t* dest, size_t len);
+void parse_b64(const char* val, uint8_t* dest, size_t len);
 
 void utf16_to_utf8(const uint16_t *src, uint8_t *dst);
 
