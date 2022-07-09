@@ -1,6 +1,7 @@
 #include "context.h"
 #include "config.h"
 #include "host.h"
+#include "discovery.h"
 #include "audio.h"
 #include "video.h"
 #include "string.h"
@@ -165,10 +166,11 @@ int host_stream(VitaChiakiHost* host) {
   if (!host->hostname || !host->registered_state) {
     return 1;
   }
+  stop_discovery();
   ChiakiConnectVideoProfile profile = {};
 	chiaki_connect_video_profile_preset(&profile,
 		context.config.resolution, context.config.fps);
-  // profile.bitrate = 12000;
+  profile.bitrate = 15000;
 	// Build chiaki ps4 stream session
 	ChiakiAudioSink audio_sink;
 	chiaki_opus_decoder_init(&context.stream.opus_decoder, &context.log);
