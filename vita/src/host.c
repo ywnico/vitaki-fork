@@ -166,7 +166,7 @@ int host_stream(VitaChiakiHost* host) {
   if (!host->hostname || !host->registered_state) {
     return 1;
   }
-  stop_discovery();
+  // stop_discovery();
   ChiakiConnectVideoProfile profile = {};
 	chiaki_connect_video_profile_preset(&profile,
 		context.config.resolution, context.config.fps);
