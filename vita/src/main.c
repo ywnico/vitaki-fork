@@ -33,6 +33,7 @@
 #include <psp2/libssl.h>
 #include <psp2/rtc.h>
 #include <psp2/sysmodule.h>
+#include <psp2/power.h>
 #include <psp2/touch.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -47,6 +48,11 @@
 #include "ui.h"
 
 static int vita_init() {
+  // Overclock various aspects of the vita
+  scePowerSetArmClockFrequency(444);
+  scePowerSetGpuClockFrequency(222);
+  scePowerSetBusClockFrequency(222);
+  scePowerSetGpuXbarClockFrequency(166);
   // Seed OpenSSL with Sony-grade random number generator
   char random_seed[0x40] = {0};
   sceKernelGetRandomNumber(random_seed, sizeof(random_seed));

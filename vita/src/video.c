@@ -682,7 +682,7 @@ bool vita_h264_process_header(uint8_t *data, size_t data_len) {
 }
 
 // uint8_t *lbuf;
-bool infirst_frame = false;
+// bool infirst_frame = false;
 int vita_h264_decode_frame(uint8_t *buf, size_t buf_size) {
   // free(lbuf);
   // lbuf = buf;
@@ -692,26 +692,26 @@ int vita_h264_decode_frame(uint8_t *buf, size_t buf_size) {
 		sceKernelChangeThreadCpuAffinityMask(SCE_KERNEL_THREAD_ID_SELF, 0);
 		threadSetupComplete = true;
 	}
-  if (first_frame) {
-    first_frame = false;
-    infirst_frame = true;
-    // header_buf = memalign(DECODE_AU_ALIGNMENT, buf_size);
-    // if (header_buf == NULL) {
-    //   LOGD("not enough memory for header buf\n");
-    //   return 1;
-    // }
+  // if (first_frame) {
+  //   first_frame = false;
+  //   // infirst_frame = true;
+  //   // header_buf = memalign(DECODE_AU_ALIGNMENT, buf_size);
+  //   // if (header_buf == NULL) {
+  //   //   LOGD("not enough memory for header buf\n");
+  //   //   return 1;
+  //   // }
 
-    // header_buf_size = buf_size;
-    // sceClibMemcpy(header_buf, buf, buf_size);
+  //   // header_buf_size = buf_size;
+  //   // sceClibMemcpy(header_buf, buf, buf_size);
 
-    vita_h264_process_header(buf, buf_size);
-    // header_buf = buf;
-    // header_buf_size = buf_size;
-    // hexdump(buf, buf_size);
+  //   vita_h264_process_header(buf, buf_size);
+  //   // header_buf = buf;
+  //   // header_buf_size = buf_size;
+  //   // hexdump(buf, buf_size);
 
-    // chiaki_mutex_unlock(&mtx);
-    // return 0;
-  }
+  //   // chiaki_mutex_unlock(&mtx);
+  //   // return 0;
+  // }
 
 
 
@@ -784,19 +784,19 @@ int vita_h264_decode_frame(uint8_t *buf, size_t buf_size) {
 
   if (array_picture.numOfOutput != 1) {
     LOGD("numOfOutput %d bufSize 0x%x\n", array_picture.numOfOutput, buf_size);
-    if (infirst_frame) {
-      infirst_frame = false;
-      // if (isEdited) free(buf);
-      chiaki_mutex_unlock(&mtx);
-      return 0;
-    } else {
+    // if (infirst_frame) {
+    //   infirst_frame = false;
+    //   // if (isEdited) free(buf);
+    //   chiaki_mutex_unlock(&mtx);
+    //   return 0;
+    // } else {
       // goto fix;
       // if (isEdited) free(buf);
       chiaki_mutex_unlock(&mtx);
       return 0;
       // chiaki_mutex_unlock(&mtx);
       // return 1;
-    }
+    // }
     // if (first_frame) {
     //   first_frame = false;
     //   chiaki_mutex_unlock(&mtx);
@@ -815,7 +815,7 @@ int vita_h264_decode_frame(uint8_t *buf, size_t buf_size) {
 
       draw_streaming(frame_texture);
       // draw_fps();
-      draw_indicators();
+      // draw_indicators();
 
       vita2d_end_drawing();
 
@@ -837,7 +837,7 @@ int vita_h264_decode_frame(uint8_t *buf, size_t buf_size) {
 
 void draw_streaming(vita2d_texture *frame_texture) {
   // ui is still rendering in the background, clear the screen first
-  vita2d_clear_screen();
+  // vita2d_clear_screen();
   vita2d_draw_texture_part(frame_texture,
                            image_scaling.origin_x,
                            image_scaling.origin_y,
