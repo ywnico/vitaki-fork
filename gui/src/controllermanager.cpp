@@ -68,6 +68,12 @@ static QSet<QString> chiaki_motion_controller_guids({
 	"030000008f0e00001431000000000000",
 });
 
+static QSet<QPair<int16_t, int16_t>> chiaki_dualsense_controller_ids({
+	// in format (vendor id, product id)
+	QPair<int16_t, int16_t>(0x054c, 0x0ce6), // DualSense controller
+	QPair<int16_t, int16_t>(0x054c, 0x0df2), // DualSense Edge controller
+});
+
 static ControllerManager *instance = nullptr;
 
 #define UPDATE_INTERVAL_MS 4
@@ -84,6 +90,15 @@ ControllerManager::ControllerManager(QObject *parent)
 {
 #ifdef CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
 	SDL_SetMainReady();
+#ifdef SDL_HINT_JOYSTICK_HIDAPI_PS4_RUMBLE
+	SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS4_RUMBLE, "1");
+#endif
+#ifdef SDL_HINT_JOYSTICK_HIDAPI_PS5_RUMBLE
+	SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS5_RUMBLE, "1");
+#endif
+#ifdef SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS
+	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+#endif
 	if(SDL_Init(SDL_INIT_GAMECONTROLLER) < 0)
 	{
 		const char *err = SDL_GetError();
@@ -225,7 +240,8 @@ void ControllerManager::ControllerClosed(Controller *controller)
 	open_controllers.remove(controller->GetDeviceID());
 }
 
-Controller::Controller(int device_id, ControllerManager *manager) : QObject(manager)
+Controller::Controller(int device_id, ControllerManager *manager)
+	: QObject(manager), is_dualsense(false)
 {
 	this->id = device_id;
 	this->manager = manager;
@@ -244,8 +260,10 @@ Controller::Controller(int device_id, ControllerManager *manager) : QObject(mana
 				SDL_GameControllerSetSensorEnabled(controller, SDL_SENSOR_ACCEL, SDL_TRUE);
 			if(SDL_GameControllerHasSensor(controller, SDL_SENSOR_GYRO))
 				SDL_GameControllerSetSensorEnabled(controller, SDL_SENSOR_GYRO, SDL_TRUE);
-			break;
 #endif
+			auto controller_id = QPair<int16_t, int16_t>(SDL_GameControllerGetVendor(controller), SDL_GameControllerGetProduct(controller));
+			is_dualsense = chiaki_dualsense_controller_ids.contains(controller_id);
+			break;
 		}
 	}
 #endif
@@ -255,7 +273,12 @@ Controller::~Controller()
 {
 #ifdef CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
 	if(controller)
+	{
+		// Clear trigger effects, SDL doesn't do it automatically
+		const uint8_t clear_effect[10] = { 0 };
+		this->SetTriggerEffects(0x05, clear_effect, 0x05, clear_effect);
 		SDL_GameControllerClose(controller);
+	}
 #endif
 	manager->ControllerClosed(this);
 }
@@ -485,5 +508,30 @@ void Controller::SetRumble(uint8_t left, uint8_t right)
 	if(!controller)
 		return;
 	SDL_GameControllerRumble(controller, (uint16_t)left << 8, (uint16_t)right << 8, 5000);
+#endif
+}
+
+void Controller::SetTriggerEffects(uint8_t type_left, const uint8_t *data_left, uint8_t type_right, const uint8_t *data_right)
+{
+#if defined(CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER) && SDL_VERSION_ATLEAST(2, 0, 16)
+	if(!is_dualsense || !controller)
+		return;
+	DS5EffectsState_t state;
+	SDL_zero(state);
+	state.ucEnableBits1 |= (0x04 /* left trigger */ | 0x08 /* right trigger */);
+	state.rgucLeftTriggerEffect[0] = type_left;
+	SDL_memcpy(state.rgucLeftTriggerEffect + 1, data_left, 10);
+	state.rgucRightTriggerEffect[0] = type_right;
+	SDL_memcpy(state.rgucRightTriggerEffect + 1, data_right, 10);
+	SDL_GameControllerSendEffect(controller, &state, sizeof(state));
+#endif
+}
+
+bool Controller::IsDualSense()
+{
+#ifdef CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
+	if(!controller)
+		return false;
+	return is_dualsense;
 #endif
 }

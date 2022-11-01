@@ -37,7 +37,7 @@ for:
     install:
       - git submodule update --init --recursive
       - sudo pip3 install protobuf
-      - brew install qt@5 opus openssl@1.1 nasm sdl2 protobuf
+      - HOMEBREW_NO_AUTO_UPDATE=1 brew install qt@5 opus openssl@1.1 nasm sdl2 protobuf
       - scripts/build-ffmpeg.sh
 
     build_script:
