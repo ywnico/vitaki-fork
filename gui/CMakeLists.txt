@@ -6,9 +6,6 @@ find_package(Qt5 REQUIRED COMPONENTS Core Widgets Gui Concurrent Multimedia Open
 if(APPLE)
 	find_package(Qt5 REQUIRED COMPONENTS MacExtras)
 endif()
-if(CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER)
-	find_package(SDL2 MODULE REQUIRED)
-endif()
 
 if(WIN32)
 	add_definitions(-DWIN32_LEAN_AND_MEAN)

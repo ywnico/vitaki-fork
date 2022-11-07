@@ -121,6 +121,19 @@ CHIAKI_EXPORT void chiaki_controller_state_or(ChiakiControllerState *out, Chiaki
 	out->right_x = MAX_ABS(a->right_x, b->right_x);
 	out->right_y = MAX_ABS(a->right_y, b->right_y);
 
+	#define ORF(n, idle_val) if(a->n == idle_val) out->n = b->n; else out->n = a->n
+	ORF(accel_x, 0.0f);
+	ORF(accel_y, 1.0f);
+	ORF(accel_z, 0.0f);
+	ORF(gyro_x, 0.0f);
+	ORF(gyro_y, 0.0f);
+	ORF(gyro_z, 0.0f);
+	ORF(orient_x, 0.0f);
+	ORF(orient_y, 0.0f);
+	ORF(orient_z, 0.0f);
+	ORF(orient_w, 1.0f);
+	#undef ORF
+
 	out->touch_id_next = 0;
 	for(size_t i = 0; i < CHIAKI_CONTROLLER_TOUCHES_MAX; i++)
 	{

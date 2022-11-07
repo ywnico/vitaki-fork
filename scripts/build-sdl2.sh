@@ -6,9 +6,10 @@ cd $(dirname "${BASH_SOURCE[0]}")/..
 cd "./$1"
 ROOT="`pwd`"
 
-URL=https://www.libsdl.org/release/SDL2-2.0.10.tar.gz
-FILE=SDL2-2.0.10.tar.gz
-DIR=SDL2-2.0.10
+SDL_VER=2.26.1
+URL=https://www.libsdl.org/release/SDL2-${SDL_VER}.tar.gz
+FILE=SDL2-${SDL_VER}.tar.gz
+DIR=SDL2-${SDL_VER}
 
 if [ ! -d "$DIR" ]; then
 	curl -L "$URL" -O
