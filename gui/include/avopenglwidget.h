@@ -3,6 +3,8 @@
 #ifndef CHIAKI_AVOPENGLWIDGET_H
 #define CHIAKI_AVOPENGLWIDGET_H
 
+#include "transformmode.h"
+
 #include <chiaki/log.h>
 
 #include <QOpenGLWidget>
@@ -74,21 +76,24 @@ class AVOpenGLWidget: public QOpenGLWidget
 	public:
 		static QSurfaceFormat CreateSurfaceFormat();
 
-		explicit AVOpenGLWidget(StreamSession *session, QWidget *parent = nullptr);
+		explicit AVOpenGLWidget(StreamSession *session, QWidget *parent = nullptr, TransformMode transform_mode = TransformMode::Fit);
 		~AVOpenGLWidget() override;
 
 		void SwapFrames();
 		AVOpenGLFrame *GetBackgroundFrame()	{ return &frames[1 - frame_fg]; }
 
+		void SetTransformMode(TransformMode mode) { transform_mode = mode; }
+		TransformMode GetTransformMode() const { return transform_mode; }
+
 	protected:
+		TransformMode transform_mode;
 		void mouseMoveEvent(QMouseEvent *event) override;
 
 		void initializeGL() override;
 		void paintGL() override;
 
-	private slots:
-		void ResetMouseTimeout();
 	public slots:
+		void ResetMouseTimeout();
 		void HideMouse();
 };
 

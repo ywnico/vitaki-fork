@@ -22,10 +22,14 @@ class StreamWindow: public QMainWindow
 		const StreamSessionConnectInfo connect_info;
 		StreamSession *session;
 
+		QAction *fullscreen_action;
+		QAction *stretch_action;
+		QAction *zoom_action;
 		AVOpenGLWidget *av_widget;
 
 		void Init();
 		void UpdateVideoTransform();
+		void UpdateTransformModeActions();
 
 	protected:
 		void keyPressEvent(QKeyEvent *event) override;
@@ -42,6 +46,8 @@ class StreamWindow: public QMainWindow
 		void SessionQuit(ChiakiQuitReason reason, const QString &reason_str);
 		void LoginPINRequested(bool incorrect);
 		void ToggleFullscreen();
+		void ToggleStretch();
+		void ToggleZoom();
 };
 
 #endif // CHIAKI_GUI_STREAMWINDOW_H

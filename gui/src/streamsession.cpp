@@ -14,7 +14,14 @@
 
 #define SETSU_UPDATE_INTERVAL_MS 4
 
-StreamSessionConnectInfo::StreamSessionConnectInfo(Settings *settings, ChiakiTarget target, QString host, QByteArray regist_key, QByteArray morning, bool fullscreen)
+StreamSessionConnectInfo::StreamSessionConnectInfo(
+		Settings *settings,
+		ChiakiTarget target,
+		QString host,
+		QByteArray regist_key,
+		QByteArray morning,
+		bool fullscreen,
+		TransformMode transform_mode)
 	: settings(settings)
 {
 	key_map = settings->GetControllerMappingForDecoding();
@@ -30,6 +37,7 @@ StreamSessionConnectInfo::StreamSessionConnectInfo(Settings *settings, ChiakiTar
 	this->morning = morning;
 	audio_buffer_size = settings->GetAudioBufferSize();
 	this->fullscreen = fullscreen;
+	this->transform_mode = transform_mode;
 	this->enable_keyboard = false; // TODO: from settings
 }
 
@@ -228,13 +236,16 @@ void StreamSession::SetLoginPIN(const QString &pin)
 	chiaki_session_set_login_pin(&session, (const uint8_t *)data.constData(), data.size());
 }
 
-void StreamSession::HandleMouseEvent(QMouseEvent *event)
+bool StreamSession::HandleMouseEvent(QMouseEvent *event)
 {
+	if(event->button() != Qt::MouseButton::LeftButton)
+		return false;
 	if(event->type() == QEvent::MouseButtonPress)
 		keyboard_state.buttons |= CHIAKI_CONTROLLER_BUTTON_TOUCHPAD;
 	else
 		keyboard_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_TOUCHPAD;
 	SendFeedbackState();
+	return true;
 }
 
 void StreamSession::HandleKeyboardEvent(QKeyEvent *event)

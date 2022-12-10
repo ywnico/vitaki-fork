@@ -122,9 +122,9 @@ QSurfaceFormat AVOpenGLWidget::CreateSurfaceFormat()
 	return format;
 }
 
-AVOpenGLWidget::AVOpenGLWidget(StreamSession *session, QWidget *parent)
+AVOpenGLWidget::AVOpenGLWidget(StreamSession *session, QWidget *parent, TransformMode transform_mode)
 	: QOpenGLWidget(parent),
-	session(session)
+	session(session), transform_mode(transform_mode)
 {
 	enum AVPixelFormat pixel_format = chiaki_ffmpeg_decoder_get_pixel_format(session->GetFfmpegDecoder());
 	conversion_config = nullptr;
@@ -381,10 +381,10 @@ void AVOpenGLWidget::paintGL()
 		vp_width = widget_width;
 		vp_height = widget_height;
 	}
-	else
+	else if(transform_mode == TransformMode::Fit)
 	{
 		float aspect = (float)frame->width / (float)frame->height;
-		if(aspect < (float)widget_width / (float)widget_height)
+		if(widget_height && aspect < (float)widget_width / (float)widget_height)
 		{
 			vp_height = widget_height;
 			vp_width = (GLsizei)(vp_height * aspect);
@@ -393,6 +393,34 @@ void AVOpenGLWidget::paintGL()
 		{
 			vp_width = widget_width;
 			vp_height = (GLsizei)(vp_width / aspect);
+		}
+	}
+	else if(transform_mode == TransformMode::Zoom)
+	{
+		float aspect = (float)frame->width / (float)frame->height;
+		if(widget_height && aspect < (float)widget_width / (float)widget_height)
+		{
+			vp_width = widget_width;
+			vp_height = (GLsizei)(vp_width / aspect);
+		}
+		else
+		{
+			vp_height = widget_height;
+			vp_width = (GLsizei)(vp_height * aspect);
+		}
+	}
+	else // transform_mode == TransformMode::Stretch
+	{
+		float aspect = (float)frame->width / (float)frame->height;
+		if(widget_height && aspect < (float)widget_width / (float)widget_height)
+		{
+			vp_height = widget_height;
+			vp_width = widget_width;
+		}
+		else
+		{
+			vp_width = widget_width;
+			vp_height = widget_height;
 		}
 	}
 
