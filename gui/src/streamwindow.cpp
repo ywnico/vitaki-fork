@@ -102,6 +102,11 @@ void StreamWindow::Init()
 	addAction(zoom_action);
 	connect(zoom_action, &QAction::triggered, this, &StreamWindow::ToggleZoom);
 
+	auto quit_action = new QAction(tr("Quit"), this);
+	quit_action->setShortcut(Qt::CTRL + Qt::Key_Q);
+	addAction(quit_action);
+	connect(quit_action, &QAction::triggered, this, &StreamWindow::Quit);
+
 	resize(connect_info.video_profile.width, connect_info.video_profile.height);
 
 	if(connect_info.fullscreen)
@@ -125,6 +130,11 @@ void StreamWindow::keyReleaseEvent(QKeyEvent *event)
 {
 	if(session)
 		session->HandleKeyboardEvent(event);
+}
+
+void StreamWindow::Quit()
+{
+	close();
 }
 
 void StreamWindow::mousePressEvent(QMouseEvent *event)

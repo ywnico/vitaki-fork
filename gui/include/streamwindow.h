@@ -48,6 +48,7 @@ class StreamWindow: public QMainWindow
 		void ToggleFullscreen();
 		void ToggleStretch();
 		void ToggleZoom();
+		void Quit();
 };
 
 #endif // CHIAKI_GUI_STREAMWINDOW_H
