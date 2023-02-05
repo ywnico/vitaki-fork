@@ -33,8 +33,8 @@ endif()
 
 find_program(MAKE_EXE NAMES gmake make)
 ExternalProject_Add(OpenSSL-ExternalProject
-		URL https://www.openssl.org/source/openssl-1.1.1d.tar.gz
-		URL_HASH SHA256=1e3a91bc1f9dfce01af26026f856e064eab4c8ee0a8f457b5ae30b40b8b711f2
+		URL https://www.openssl.org/source/openssl-1.1.1s.tar.gz
+		URL_HASH SHA256=c5ac01e760ee6ff0dab61d6b2bbd30146724d063eb322180c6f18a6f74e4b6aa
 		INSTALL_DIR "${OPENSSL_INSTALL_DIR}"
 		CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env ${OPENSSL_BUILD_ENV}
 			"<SOURCE_DIR>/Configure" "--prefix=<INSTALL_DIR>" no-shared ${OPENSSL_CONFIG_EXTRA_ARGS} "${OPENSSL_OS_COMPILER}"

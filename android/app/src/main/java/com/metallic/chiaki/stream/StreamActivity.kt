@@ -174,7 +174,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			.alpha(1.0f)
 			.setListener(object: AnimatorListenerAdapter()
 			{
-				override fun onAnimationEnd(animation: Animator?)
+				override fun onAnimationEnd(animation: Animator)
 				{
 					binding.overlay.alpha = 1.0f
 				}
@@ -189,7 +189,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			.alpha(0.0f)
 			.setListener(object: AnimatorListenerAdapter()
 			{
-				override fun onAnimationEnd(animation: Animator?)
+				override fun onAnimationEnd(animation: Animator)
 				{
 					binding.overlay.isGone = true
 				}
@@ -306,6 +306,8 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 					dialog.show()
 				}
 			}
+
+			else -> {}
 		}
 	}
 
