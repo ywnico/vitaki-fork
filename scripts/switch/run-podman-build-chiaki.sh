@@ -7,5 +7,4 @@ podman run --rm \
 	-w "/build/chiaki" \
 	-it \
 	thestr4ng3r/chiaki-build-switch:v2 \
-	/bin/bash -c "scripts/switch/build.sh"
-
+	${1:-/bin/bash -c "scripts/switch/build.sh"}
