@@ -53,7 +53,7 @@ static int vita_init() {
   scePowerSetGpuClockFrequency(222);
   scePowerSetBusClockFrequency(222);
   scePowerSetGpuXbarClockFrequency(166);
-  // Seed OpenSSL with Sony-grade random number generator
+  // Seed OpenSSL
   char random_seed[0x40] = {0};
   sceKernelGetRandomNumber(random_seed, sizeof(random_seed));
   RAND_seed(random_seed, sizeof(random_seed));

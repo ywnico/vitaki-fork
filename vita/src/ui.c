@@ -346,7 +346,7 @@ char* text_input(MainWidgetId id, int x, int y, int w, int h, char* label,
 			param.inputTextBuffer = IMEInput;
 
       showingIME = true;
-      sceImeDialogInit(&param) > 0;
+      sceImeDialogInit(&param);
     }
   }
   vita2d_draw_rectangle(x + 300, y, w, h, COLOR_BLACK);
@@ -397,7 +397,7 @@ int choice_input(int x, int y, int w, int h, char* label, vita2d_texture* icon,
 }
 
 void load_psn_id_if_needed() {
-  if (!context.config.psn_account_id || strlen(context.config.psn_account_id) < 1) {
+  if (context.config.psn_account_id == NULL || strlen(context.config.psn_account_id) < 1) {
     char accIDBuf[8];
     memset(accIDBuf, 0, sizeof(accIDBuf));
     free(context.config.psn_account_id);
@@ -479,15 +479,17 @@ UIScreenType draw_main_menu() {
   }
   return next_screen;
 }
-const char* PSNID_LABEL = "PSN ID";
+char* PSNID_LABEL = "PSN ID";
 /// Draw the settings form
 /// @return whether the dialog should keep rendering
 bool draw_settings() {
-  char* text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 0, 30, 30, 600, 80, PSNID_LABEL, context.config.psn_account_id, 12);
+  char* text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 0, 30, 30, 600, 80, PSNID_LABEL, context.config.psn_account_id, 20);
   if (text != NULL) {
     // LOGD("text is %s", text);
     free(context.config.psn_account_id);
     context.config.psn_account_id = text;
+    load_psn_id_if_needed();
+    config_serialize(&context.config);
   }
   if (btn_pressed(SCE_CTRL_CIRCLE)) {
     context.ui_state.next_active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
@@ -499,7 +501,7 @@ bool draw_settings() {
 }
 
 char* LINK_CODE;
-const char* LINK_CODE_LABEL = "Registration code";
+char* LINK_CODE_LABEL = "Registration code";
 
 /// Draw the form to register a host
 /// @return whether the dialog should keep rendering
@@ -511,6 +513,7 @@ bool draw_registration_dialog() {
     LINK_CODE = text;
   }
   if (btn_pressed(SCE_CTRL_CIRCLE)) {
+    LOGD("size of lcode %d", strlen(LINK_CODE));
     if (strlen(LINK_CODE) != 0) host_register(context.active_host, atoi(LINK_CODE));
     context.ui_state.next_active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
     // free(context.config.psn_account_id);
@@ -606,7 +609,6 @@ void draw_ui() {
           }
         } else if (screen == UI_SCREEN_TYPE_SETTINGS) {
           context.ui_state.next_active_item = UI_MAIN_WIDGET_TEXT_INPUT | 0;
-          load_psn_id_if_needed();
           if (!draw_settings()) {
             screen = UI_SCREEN_TYPE_MAIN;
           }
