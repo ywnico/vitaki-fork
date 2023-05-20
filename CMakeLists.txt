@@ -1,6 +1,11 @@
 
 cmake_minimum_required(VERSION 3.2)
 
+# Fix -rdynamic error with arm-vita-eabi-gcc https://github.com/tdlib/td/issues/1558
+if (POLICY CMP0065)
+  cmake_policy(SET CMP0065 NEW)
+endif()
+
 project(chiaki)
 
 # Like option(), but the value can also be AUTO
