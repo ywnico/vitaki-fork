@@ -49,12 +49,18 @@ CHIAKI_EXPORT ChiakiTarget chiaki_discovery_host_system_version_target(ChiakiDis
 	int version = atoi(host->system_version);
 	bool is_ps5 = chiaki_discovery_host_is_ps5(host);
 
-	if(version >= 8050001 && is_ps5)
-		// PS5 >= 1.0
+	// Not sure why version 8050001 has been chosen in the first place
+	// A PS5 with current 2023 firmware reports version 07200005, which is incorrectly assume
+	// That's probably the reason why gui/src/discoverymanager.cpp doesn't use this function at all.
+	// if(version >= 8050001 && is_ps5)
+	// 	// PS5 >= 1.0
+	// 	return CHIAKI_TARGET_PS5_1;
+	// if(version >= 8050000 && is_ps5)
+	// 	// PS5 >= 0
+	// 	return CHIAKI_TARGET_PS5_UNKNOWN;
+
+	if(is_ps5)
 		return CHIAKI_TARGET_PS5_1;
-	if(version >= 8050000 && is_ps5)
-		// PS5 >= 0
-		return CHIAKI_TARGET_PS5_UNKNOWN;
 
 	if(version >= 8000000)
 		// PS4 >= 8.0
