@@ -13,7 +13,7 @@
 #include "util.h"
 
 /// Save a newly discovered host into the context
-void save_discovered_host(ChiakiDiscoveryHost* host) {
+void save_discovered_host(ChiakiDiscoveryHost* host, ChiakiLog *log) {
   // Check if the host is already known, and if not, locate a free spot for it
   uint8_t host_mac[6];
   parse_b64(host->host_id, host_mac, sizeof(host_mac));
@@ -50,13 +50,46 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
     h->hostname = NULL;
   }
 
+  CHIAKI_LOGI(log, "--");
+  CHIAKI_LOGI(log, "Discovered Host:");
+  CHIAKI_LOGI(log, "State:                             %s", chiaki_discovery_host_state_string(host->state));
+
+  if(host->system_version)
+    CHIAKI_LOGI(log, "System Version:                    %s", host->system_version);
+
+  if(host->device_discovery_protocol_version)
+    CHIAKI_LOGI(log, "Device Discovery Protocol Version: %s", host->device_discovery_protocol_version);
+
+  if(host->host_request_port)
+    CHIAKI_LOGI(log, "Request Port:                      %hu", (unsigned short)host->host_request_port);
+
+  if(host->host_name)
+    CHIAKI_LOGI(log, "Host Name:                         %s", host->host_name);
+
+  if(host->host_type)
+    CHIAKI_LOGI(log, "Host Type:                         %s", host->host_type);
+
+  if(host->host_id)
+    CHIAKI_LOGI(log, "Host ID:                           %s", host->host_id);
+
+  if(host->running_app_titleid)
+    CHIAKI_LOGI(log, "Running App Title ID:              %s", host->running_app_titleid);
+
+  if(host->running_app_name)
+    CHIAKI_LOGI(log, "Running App Name:                  %s%s", host->running_app_name, (strcmp(host->running_app_name, "Persona 5") == 0 ? " (best game ever)" : ""));
+
   h->type |= DISCOVERED;
-  h->target = chiaki_discovery_host_system_version_target(host);
+  ChiakiTarget target = chiaki_discovery_host_system_version_target(host);
+  CHIAKI_LOGI(log,   "Is PS5:                            %s", chiaki_target_is_ps5(target) ? "true" : "false");
+  h->target = target;
   memcpy(&(h->server_mac), &host_mac, 6);
   h->discovery_state =
       (ChiakiDiscoveryHost*)malloc(sizeof(ChiakiDiscoveryHost));
   memcpy(h->discovery_state, host, sizeof(ChiakiDiscoveryHost));
   h->hostname = strdup(h->discovery_state->host_addr);
+
+  CHIAKI_LOGI(log, "--");
+
   context.hosts[target_idx] = h;
   context.num_hosts++;
 
@@ -83,8 +116,10 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
 
 /// Called whenever new hosts are discovered
 void discovery_cb(ChiakiDiscoveryHost* hosts, size_t hosts_count, void* user) {
+  ChiakiLog *log = user;
+
   for (int dhost_idx = 0; dhost_idx < hosts_count; dhost_idx++) {
-    save_discovered_host(&hosts[dhost_idx]);
+    save_discovered_host(&hosts[dhost_idx], log);
   }
 
   // Call caller-defined callback
