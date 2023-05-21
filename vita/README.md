@@ -21,12 +21,12 @@ installed:
 
 **Build, upload, launch and show debug log:**
 ```
-python3 ./scripts/vita/devtool.py -h $VITAIP run
+python3 ./scripts/vita/devtool.py --host $PSVITAIP run
 ```
 
 **Fetch latest backtrace:**
 ```
-python3 ./scripts/vita/devtool.py -h $VITAIP backtrace
+python3 ./scripts/vita/devtool.py --host $PSVITAIP backtrace
 ```
 
 If the `kvdb` and `vdbtcp` plugins are installed on the Vita, you can attach
