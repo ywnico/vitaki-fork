@@ -24,6 +24,7 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
     if (h == NULL) {
       // Found a free spot
       target_idx = host_idx;
+      break;
     } else if (h->type & DISCOVERED) {
       if (mac_addrs_match(&(h->server_mac), &host_mac)) {
         // Already known discovered hosts, we can skip saving
