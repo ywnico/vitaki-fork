@@ -63,8 +63,12 @@ typedef enum ui_main_widget_id_t {
   UI_MAIN_WIDGET_REGISTER_BTN,
   UI_MAIN_WIDGET_DISCOVERY_BTN,
   UI_MAIN_WIDGET_SETTINGS_BTN,
+
+  // FIXME: this is bound to fail REALLY fast if we start adding more inputs in the future
   UI_MAIN_WIDGET_TEXT_INPUT,
-  UI_MAIN_WIDGET_HOST_TILE,
+
+  // needs to bitwise mask with up to 4 items (current max host count), so >=2 bits (may be increased in the future), and 4 is already occupied by TEXT_INPUT
+  UI_MAIN_WIDGET_HOST_TILE = 1 << 3,
 } MainWidgetId;
 
 /// Types of actions that can be performed on hosts
