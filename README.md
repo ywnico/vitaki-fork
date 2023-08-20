@@ -28,7 +28,7 @@ Builds are provided for Linux, Android, macOS, Nintendo Switch and Windows.
 You can download them [here](https://git.sr.ht/~thestr4ng3r/chiaki/refs).
 
 * **Linux**: The provided file is an [AppImage](https://appimage.org/). Simply make it executable (`chmod +x <file>.AppImage`) and run it.
-* **Android**: Install from [Google Play](https://play.google.com/store/apps/details?id=com.metallic.chiaki), [F-Droid](https://f-droid.org/packages/com.metallic.chiaki/) or download the APK from Sourcehut.
+* **Android**: Install from [F-Droid](https://f-droid.org/packages/com.metallic.chiaki/) or download the APK from Sourcehut.
 * **macOS**: Drag the application from the `.dmg` into your Applications folder.
 * **Windows**: Extract the `.zip` file and execute `chiaki.exe`.
 * **Switch**: Download the `.nro` file and copy it into the `switch/` directory on your SD card.
