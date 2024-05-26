@@ -42,6 +42,7 @@ target_link_libraries(${VITA_APP_NAME}.elf
   opus
 
   freetype
+  bz2
   png
   jpeg
   z
