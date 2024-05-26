@@ -61,7 +61,8 @@ typedef enum takion_packet_type_t {
 	TAKION_PACKET_TYPE_CONGESTION = 5,
 	TAKION_PACKET_TYPE_FEEDBACK_STATE = 6,
 	TAKION_PACKET_TYPE_CLIENT_INFO = 8,
-	TAKION_PACKET_TYPE_PAD_INFO_EVENT = 9
+	TAKION_PACKET_TYPE_PAD_INFO_EVENT = 9,
+	TAKION_PACKET_TYPE_PAD_ADAPTIVE_TRIGGERS = 11,
 } TakionPacketType;
 
 /**
@@ -221,6 +222,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 	takion->postponed_packets = NULL;
 	takion->postponed_packets_size = 0;
 	takion->postponed_packets_count = 0;
+	takion->enable_dualsense = info->enable_dualsense;
 
 	CHIAKI_LOGI(takion->log, "Takion connecting (version %u)", (unsigned int)info->protocol_version);
 
@@ -981,6 +983,7 @@ static void takion_flush_data_queue(ChiakiTakion *takion)
 
 		if(data_type != CHIAKI_TAKION_MESSAGE_DATA_TYPE_PROTOBUF
 				&& data_type != CHIAKI_TAKION_MESSAGE_DATA_TYPE_RUMBLE
+				&& data_type != CHIAKI_TAKION_MESSAGE_DATA_TYPE_TRIGGER_EFFECTS
 				&& data_type != CHIAKI_TAKION_MESSAGE_DATA_TYPE_9)
 		{
 			CHIAKI_LOGW(takion->log, "Takion received data with unexpected data type %#x", data_type);
@@ -1339,7 +1342,7 @@ static ChiakiErrorCode av_packet_parse(bool v12, ChiakiTakionAVPacket *packet, C
 
 	if(v12 && !packet->is_video)
 	{
-		packet->byte_before_audio_data = *av;
+		packet->is_haptics = *av == 0x02;
 		av += 1;
 		av_size -= 1;
 	}

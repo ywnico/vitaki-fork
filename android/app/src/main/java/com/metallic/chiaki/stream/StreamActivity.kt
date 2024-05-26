@@ -174,7 +174,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			.alpha(1.0f)
 			.setListener(object: AnimatorListenerAdapter()
 			{
-				override fun onAnimationEnd(animation: Animator?)
+				override fun onAnimationEnd(animation: Animator)
 				{
 					binding.overlay.alpha = 1.0f
 				}
@@ -189,7 +189,7 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 			.alpha(0.0f)
 			.setListener(object: AnimatorListenerAdapter()
 			{
-				override fun onAnimationEnd(animation: Animator?)
+				override fun onAnimationEnd(animation: Animator)
 				{
 					binding.overlay.isGone = true
 				}
@@ -230,28 +230,33 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 		{
 			is StreamStateQuit ->
 			{
-				if(!state.reason.isStopped && dialogContents != StreamQuitDialog)
+				if(dialogContents != StreamQuitDialog)
 				{
-					dialog?.dismiss()
-					val reasonStr = state.reasonString
-					val dialog = MaterialAlertDialogBuilder(this)
-						.setMessage(getString(R.string.alert_message_session_quit, state.reason.toString())
-								+ (if(reasonStr != null) "\n$reasonStr" else ""))
-						.setPositiveButton(R.string.action_reconnect) { _, _ ->
-							dialog = null
-							reconnect()
-						}
-						.setOnCancelListener {
-							dialog = null
-							finish()
-						}
-						.setNegativeButton(R.string.action_quit_session) { _, _ ->
-							dialog = null
-							finish()
-						}
-						.create()
-					dialogContents = StreamQuitDialog
-					dialog.show()
+					if(state.reason.isError)
+					{
+						dialog?.dismiss()
+						val reasonStr = state.reasonString
+						val dialog = MaterialAlertDialogBuilder(this)
+							.setMessage(getString(R.string.alert_message_session_quit, state.reason.toString())
+									+ (if(reasonStr != null) "\n$reasonStr" else ""))
+							.setPositiveButton(R.string.action_reconnect) { _, _ ->
+								dialog = null
+								reconnect()
+							}
+							.setOnCancelListener {
+								dialog = null
+								finish()
+							}
+							.setNegativeButton(R.string.action_quit_session) { _, _ ->
+								dialog = null
+								finish()
+							}
+							.create()
+						dialogContents = StreamQuitDialog
+						dialog.show()
+					}
+					else
+						finish()
 				}
 			}
 
@@ -306,6 +311,8 @@ class StreamActivity : AppCompatActivity(), View.OnSystemUiVisibilityChangeListe
 					dialog.show()
 				}
 			}
+
+			else -> {}
 		}
 	}
 

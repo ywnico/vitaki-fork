@@ -146,11 +146,19 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_recv_http_header(int sock, char *buf, size_
 				return err;
 		}
 
+		int received;
+		do
+		{
 		// #ifdef __PSVITA__
-		// 	int received = (int)sceNetRecv(sock, buf, (int)buf_size, 0);
+		// 	received = (int)sceNetRecv(sock, buf, (int)buf_size, 0);
 		// #else
-			int received = (int)recv(sock, buf, (int)buf_size, 0);
+			received = (int)recv(sock, buf, (int)buf_size, 0);
 		// #endif
+#if _WIN32
+		} while(false);
+#else
+		} while(received < 0 && errno == EINTR);
+#endif
 		if(received <= 0)
 			return received == 0 ? CHIAKI_ERR_DISCONNECTED : CHIAKI_ERR_NETWORK;
 
