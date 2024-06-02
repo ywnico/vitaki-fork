@@ -58,17 +58,9 @@ static void chiaki_opus_decoder_header(ChiakiAudioHeader *header, void *user)
 	CHIAKI_LOGI(decoder->log, "ChiakiOpusDecoder initialized");
 
 	size_t pcm_buf_size_required = chiaki_audio_header_frame_buf_size(header);
-	#ifdef __PSVITA__
-		// Vita only works with buffer sizes that are a multiple of 64
-		pcm_buf_size_required = 512 * header->channels * sizeof(int16_t);
-	#endif
 	int16_t *pcm_buf_old = decoder->pcm_buf;
 	if(!decoder->pcm_buf || decoder->pcm_buf_size != pcm_buf_size_required) {
 		decoder->pcm_buf = realloc(decoder->pcm_buf, pcm_buf_size_required);
-		#ifdef __PSVITA__
-			// remove garbage data because we have to overallocate the buffer on Vita
-			memset(decoder->pcm_buf, 0, pcm_buf_size_required);
-		#endif
 	}
 
 	if(!decoder->pcm_buf)
