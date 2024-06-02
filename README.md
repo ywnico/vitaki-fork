@@ -1,6 +1,13 @@
 
 ![Chiaki Logo](assets/chiaki_wide.png)
 
+# Vitaki fork notes
+
+This is ywnico's fork of [aa's Vitaki](https://git.catvibers.me/aa/chiaki) with the following updates:
+1. Fixed audio
+2. Includes [ghost's LiveArea icon fixes](https://git.catvibers.me/aa/chiaki/pulls/13)
+3. Updated from upstream Chiaki (may have improved some connection issues)
+
 # Chiaki
 
 **Disclaimer:** This project is not endorsed or certified by Sony Interactive Entertainment LLC.
