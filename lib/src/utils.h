@@ -96,8 +96,7 @@ static inline int sendto_broadcast(ChiakiLog *log, chiaki_socket_t s, const void
 // #elif defined(__PSVITA__)
 // 	return sceNetSendto(s, msg, len, flags, (SceNetSockaddr*)to, tolen);
 #endif
-	// printf("%s\n", inet_ntoa(((sockaddr_in)(*(struct sockaddr_in *)to)).sin_addr));
-	return sendto(s, msg, len, flags, to, tolen);
+	return sendto(s, (CHIAKI_SOCKET_BUF_TYPE) msg, len, flags, to, tolen);
 }
 
 static inline void xor_bytes(uint8_t *dst, uint8_t *src, size_t sz)

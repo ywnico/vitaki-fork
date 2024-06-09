@@ -33,6 +33,7 @@ class HostMAC
 };
 
 static bool operator==(const HostMAC &a, const HostMAC &b)	{ return memcmp(a.GetMAC(), b.GetMAC(), 6) == 0; }
+static bool operator!=(const HostMAC &a, const HostMAC &b)	{ return !(a == b); }
 static bool operator<(const HostMAC &a, const HostMAC &b)	{ return a.GetValue() < b.GetValue(); }
 
 class RegisteredHost
@@ -48,18 +49,20 @@ class RegisteredHost
 		char rp_regist_key[CHIAKI_SESSION_AUTH_SIZE];
 		uint32_t rp_key_type;
 		uint8_t rp_key[0x10];
+		QString console_pin;
 
 	public:
 		RegisteredHost();
 		RegisteredHost(const RegisteredHost &o);
 
 		RegisteredHost(const ChiakiRegisteredHost &chiaki_host);
-
+		void SetConsolePin(RegisteredHost &host, QString console_pin);
 		ChiakiTarget GetTarget() const			{ return target; }
 		const HostMAC &GetServerMAC() const 	{ return server_mac; }
 		const QString &GetServerNickname() const	{ return server_nickname; }
 		const QByteArray GetRPRegistKey() const	{ return QByteArray(rp_regist_key, sizeof(rp_regist_key)); }
 		const QByteArray GetRPKey() const		{ return QByteArray((const char *)rp_key, sizeof(rp_key)); }
+		const QString GetConsolePin() const				{ return console_pin; }
 
 		void SaveToSettings(QSettings *settings) const;
 		static RegisteredHost LoadFromSettings(QSettings *settings);
@@ -77,6 +80,7 @@ class ManualHost
 		ManualHost();
 		ManualHost(int id, const QString &host, bool registered, const HostMAC &registered_mac);
 		ManualHost(int id, const ManualHost &o);
+		void SetHost(const QString &hostadd);
 
 		int GetID() const 			{ return id; }
 		QString GetHost() const 	{ return host; }
@@ -89,8 +93,27 @@ class ManualHost
 		static ManualHost LoadFromSettings(QSettings *settings);
 };
 
+class PsnHost
+{
+	private:
+	    QString duid;
+		QString name;
+		bool ps5;
+
+	public:
+		PsnHost();
+		PsnHost(const QString &duid, const QString &name, bool ps5);
+
+		QString GetDuid() const          { return duid; }
+		QString GetName() const          { return name; }
+		bool IsPS5() const               { return ps5;  }
+		ChiakiTarget GetTarget() const;
+
+};
+
 Q_DECLARE_METATYPE(HostMAC)
 Q_DECLARE_METATYPE(RegisteredHost)
 Q_DECLARE_METATYPE(ManualHost)
+Q_DECLARE_METATYPE(PsnHost)
 
 #endif //CHIAKI_HOST_H

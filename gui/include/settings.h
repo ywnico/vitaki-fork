@@ -8,7 +8,7 @@
 #include "host.h"
 
 #include <QSettings>
-#include <QAudioDeviceInfo>
+#include <QList>
 
 enum class ControllerButtonExt
 {
@@ -30,10 +30,29 @@ enum class DisconnectAction
 	Ask
 };
 
+enum class SuspendAction
+{
+	Nothing,
+	Sleep,
+};
+
 enum class Decoder
 {
 	Ffmpeg,
 	Pi
+};
+
+enum class PlaceboPreset {
+	Fast,
+	Default,
+	HighQuality
+};
+
+enum class WindowType {
+	SelectedResolution,
+	Fullscreen,
+	Zoom,
+	Stretch
 };
 
 class Settings : public QObject
@@ -42,8 +61,11 @@ class Settings : public QObject
 
 	private:
 		QSettings settings;
+		QString time_format;
 
 		QMap<HostMAC, RegisteredHost> registered_hosts;
+		QMap<QString, RegisteredHost> nickname_registered_hosts;
+		size_t ps4s_registered;
 		QMap<int, ManualHost> manual_hosts;
 		int manual_hosts_id_next;
 
@@ -54,7 +76,7 @@ class Settings : public QObject
 		void SaveManualHosts();
 
 	public:
-		explicit Settings(QObject *parent = nullptr);
+		explicit Settings(const QString &conf, QObject *parent = nullptr);
 
 		bool GetDiscoveryEnabled() const		{ return settings.value("settings/auto_discovery", true).toBool(); }
 		void SetDiscoveryEnabled(bool enabled)	{ settings.setValue("settings/auto_discovery", enabled); }
@@ -63,8 +85,25 @@ class Settings : public QObject
 		void SetLogVerbose(bool enabled)		{ settings.setValue("settings/log_verbose", enabled); }
 		uint32_t GetLogLevelMask();
 
-		bool GetDualSenseEnabled() const		{ return settings.value("settings/dualsense_enabled", false).toBool(); }
+		bool GetDualSenseEnabled() const		{ return settings.value("settings/dualsense_enabled", true).toBool(); }
 		void SetDualSenseEnabled(bool enabled)	{ settings.setValue("settings/dualsense_enabled", enabled); }
+
+		bool GetButtonsByPosition() const 		{ return settings.value("settings/buttons_by_pos", false).toBool(); }
+		void SetButtonsByPosition(bool enabled) { settings.setValue("settings/buttons_by_pos", enabled); }
+
+		bool GetStartMicUnmuted() const          { return settings.value("settings/start_mic_unmuted", false).toBool(); }
+		void SetStartMicUnmuted(bool unmuted) { return settings.setValue("settings/start_mic_unmuted", unmuted); }
+
+#ifdef CHIAKI_GUI_ENABLE_STEAMDECK_NATIVE
+		bool GetVerticalDeckEnabled() const       { return settings.value("settings/gyro_inverted", false).toBool(); }
+		void SetVerticalDeckEnabled(bool enabled) { settings.setValue("settings/gyro_inverted", enabled); }
+
+		bool GetSteamDeckHapticsEnabled() const   { return settings.value("settings/steamdeck_haptics", false).toBool(); }
+		void SetSteamDeckHapticsEnabled(bool enabled) { settings.setValue("settings/steamdeck_haptics", enabled); }
+#endif
+
+		bool GetAutomaticConnect() const         { return settings.value("settings/automatic_connect", false).toBool(); }
+		void SetAutomaticConnect(bool autoconnect)    { settings.setValue("settings/automatic_connect", autoconnect); }
 
 		ChiakiVideoResolutionPreset GetResolution() const;
 		void SetResolution(ChiakiVideoResolutionPreset resolution);
@@ -87,6 +126,18 @@ class Settings : public QObject
 		QString GetHardwareDecoder() const;
 		void SetHardwareDecoder(const QString &hw_decoder);
 
+		WindowType GetWindowType() const;
+		void SetWindowType(WindowType type);
+
+		PlaceboPreset GetPlaceboPreset() const;
+		void SetPlaceboPreset(PlaceboPreset preset);
+
+		float GetZoomFactor() const;
+		void SetZoomFactor(float factor);
+
+		RegisteredHost GetAutoConnectHost() const;
+		void SetAutoConnectHost(const QByteArray &mac);
+
 		unsigned int GetAudioBufferSizeDefault() const;
 
 		/**
@@ -103,16 +154,53 @@ class Settings : public QObject
 		QString GetAudioOutDevice() const;
 		void SetAudioOutDevice(QString device_name);
 
+		QString GetAudioInDevice() const;
+		void SetAudioInDevice(QString device_name);
+
+		uint GetWifiDroppedNotif() const;
+		void SetWifiDroppedNotif(uint percent);
+
+		QString GetPsnAuthToken() const;
+		void SetPsnAuthToken(QString auth_token);
+
+		QString GetPsnRefreshToken() const;
+		void SetPsnRefreshToken(QString refresh_token);
+
+		QString GetPsnAuthTokenExpiry() const;
+		void SetPsnAuthTokenExpiry(QString expiry_date);
+
+		QString GetPsnAccountId() const;
+		void SetPsnAccountId(QString account_id);
+
+		QString GetTimeFormat() const     { return time_format; }
+		void ClearKeyMapping();
+
+#if CHIAKI_GUI_ENABLE_SPEEX
+		bool GetSpeechProcessingEnabled() const;
+		int GetNoiseSuppressLevel() const;
+		int GetEchoSuppressLevel() const;
+
+		void SetSpeechProcessingEnabled(bool enabled);
+		void SetNoiseSuppressLevel(int reduceby);
+		void SetEchoSuppressLevel(int reduceby);
+#endif
+
 		ChiakiConnectVideoProfile GetVideoProfile();
 
 		DisconnectAction GetDisconnectAction();
 		void SetDisconnectAction(DisconnectAction action);
+
+		SuspendAction GetSuspendAction();
+		void SetSuspendAction(SuspendAction action);
 
 		QList<RegisteredHost> GetRegisteredHosts() const			{ return registered_hosts.values(); }
 		void AddRegisteredHost(const RegisteredHost &host);
 		void RemoveRegisteredHost(const HostMAC &mac);
 		bool GetRegisteredHostRegistered(const HostMAC &mac) const	{ return registered_hosts.contains(mac); }
 		RegisteredHost GetRegisteredHost(const HostMAC &mac) const	{ return registered_hosts[mac]; }
+		bool GetNicknameRegisteredHostRegistered(const QString &nickname) const { return nickname_registered_hosts.contains(nickname); }
+		RegisteredHost GetNicknameRegisteredHost(const QString &nickname) const { return nickname_registered_hosts[nickname]; }
+		size_t GetPS4RegisteredHostsRegistered() const { return ps4s_registered; }
 
 		QList<ManualHost> GetManualHosts() const 					{ return manual_hosts.values(); }
 		int SetManualHost(const ManualHost &host);

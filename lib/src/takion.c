@@ -5,6 +5,7 @@
 #include <chiaki/congestioncontrol.h>
 #include <chiaki/random.h>
 #include <chiaki/gkcrypt.h>
+#include <chiaki/time.h>
 
 #include <fcntl.h>
 #include <stdbool.h>
@@ -12,6 +13,10 @@
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
+
+#ifdef __APPLE__
+#include <CoreServices/CoreServices.h>
+#endif
 
 #ifdef _WIN32
 #include <ws2tcpip.h>
@@ -175,12 +180,14 @@ static ChiakiErrorCode takion_recv(ChiakiTakion *takion, uint8_t *buf, size_t *b
 static ChiakiErrorCode takion_recv_message_init_ack(ChiakiTakion *takion, TakionMessagePayloadInitAck *payload);
 static ChiakiErrorCode takion_recv_message_cookie_ack(ChiakiTakion *takion);
 static void takion_handle_packet_av(ChiakiTakion *takion, uint8_t base_type, uint8_t *buf, size_t buf_size);
+static ChiakiErrorCode takion_read_extra_sock_messages(ChiakiTakion *takion);
 
-CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, ChiakiTakionConnectInfo *info)
+CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, ChiakiTakionConnectInfo *info, chiaki_socket_t *sock)
 {
 	ChiakiErrorCode ret = CHIAKI_ERR_SUCCESS;
 
 	takion->log = info->log;
+	takion->close_socket = info->close_socket;
 	takion->version = info->protocol_version;
 	CHIAKI_LOGI(takion->log, "Init Takion");
 	switch(takion->version)
@@ -225,6 +232,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 	takion->enable_dualsense = info->enable_dualsense;
 
 	CHIAKI_LOGI(takion->log, "Takion connecting (version %u)", (unsigned int)info->protocol_version);
+	bool mac_dontfrag = true;
 
 	ChiakiErrorCode err = chiaki_stop_pipe_init(&takion->stop_pipe);
 	if(err != CHIAKI_ERR_SUCCESS)
@@ -233,82 +241,172 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 		goto error_seq_num_local_mutex;
 	}
 
-	// #ifdef __PSVITA__
-	// 	takion->sock = sceNetSocket("", info->sa->sa_family, SCE_NET_SOCK_DGRAM, SCE_NET_IPPROTO_UDP);
-	// #else
-		takion->sock = socket(info->sa->sa_family, SOCK_DGRAM, IPPROTO_UDP);
-	// #endif
-	if(CHIAKI_SOCKET_IS_INVALID(takion->sock))
+	if(sock)
 	{
-		CHIAKI_LOGE(takion->log, "Takion failed to create socket");
-		ret = CHIAKI_ERR_NETWORK;
-		goto error_pipe;
-	}
+		takion->sock = *sock;
+		err = takion_read_extra_sock_messages(takion);
+		if(err != CHIAKI_ERR_SUCCESS && err != CHIAKI_ERR_TIMEOUT)
+		{
+			CHIAKI_LOGE(takion->log, "Takion had problem reading extra messages from socket using PSN Connection with error: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
+			goto error_sock;
+		}
+		const int rcvbuf_val = takion->a_rwnd;
+		int r = setsockopt(takion->sock, SOL_SOCKET, SO_RCVBUF, (const CHIAKI_SOCKET_BUF_TYPE)&rcvbuf_val, sizeof(rcvbuf_val));
+		if(r < 0)
+		{
+			CHIAKI_LOGE(takion->log, "Takion failed to setsockopt SO_RCVBUF: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
+			ret = CHIAKI_ERR_NETWORK;
+			goto error_sock;
+		}
 
-	const int rcvbuf_val = takion->a_rwnd;
-	// #ifdef __PSVITA__
-	// 	int r = sceNetSetsockopt(takion->sock, SCE_NET_SOL_SOCKET, SCE_NET_SO_RCVBUF, (const void *)&rcvbuf_val, sizeof(rcvbuf_val));
-	// #else
-		int r = setsockopt(takion->sock, SOL_SOCKET, SO_RCVBUF, (const void *)&rcvbuf_val, sizeof(rcvbuf_val));
-	// #endif
-	if(r < 0)
-	{
-		CHIAKI_LOGE(takion->log, "Takion failed to setsockopt SO_RCVBUF: %s", strerror(errno));
-		ret = CHIAKI_ERR_NETWORK;
-		goto error_sock;
-	}
-
-	if(info->ip_dontfrag)
-	{
+#if defined(__APPLE__)
+		SInt32 majorVersion;
+		Gestalt(gestaltSystemVersionMajor, &majorVersion);
+		if(majorVersion < 11)
+		{
+			mac_dontfrag = false;
+		}
+#endif
+		if(info->ip_dontfrag)
+		{
 #if defined(_WIN32)
-		const DWORD dontfragment_val = 1;
-		r = setsockopt(takion->sock, IPPROTO_IP, IP_DONTFRAGMENT, (const void *)&dontfragment_val, sizeof(dontfragment_val));
-#elif defined(__FreeBSD__) || defined(__SWITCH__)
-		const int dontfrag_val = 1;
-		r = setsockopt(takion->sock, IPPROTO_IP, IP_DONTFRAG, (const void *)&dontfrag_val, sizeof(dontfrag_val));
+			const DWORD dontfragment_val = 1;
+			r = setsockopt(takion->sock, IPPROTO_IP, IP_DONTFRAGMENT, (const CHIAKI_SOCKET_BUF_TYPE)&dontfragment_val, sizeof(dontfragment_val));
+#elif defined(__FreeBSD__) || defined(__SWITCH__) || defined(__APPLE__)
+			if(mac_dontfrag)
+			{
+				const int dontfrag_val = 1;
+				r = setsockopt(takion->sock, IPPROTO_IP, IP_DONTFRAG, (const CHIAKI_SOCKET_BUF_TYPE)&dontfrag_val, sizeof(dontfrag_val));
+			}
+			else
+				CHIAKI_LOGW(takion->log, "Don't fragment is not supported on this platform, MTU values may be incorrect.");
 #elif defined(__PSVITA__)
-		CHIAKI_LOGW(takion->log, "Don't fragment is not supported on this platform, MTU values may be incorrect.");
-		#define NO_DONTFRAG
+			CHIAKI_LOGW(takion->log, "Don't fragment is not supported on this platform, MTU values may be incorrect.");
 		// const int dontfrag_val = 1;
 		// r = sceNetSetsockopt(takion->sock, SCE_NET_IPPROTO_IP, SCE_NET_IP_DF, (const void *)&dontfrag_val, sizeof(dontfrag_val));
+		// FIXME ywnico: can we do dontfrag?
 #elif defined(IP_PMTUDISC_DO)
-		const int mtu_discover_val = IP_PMTUDISC_DO;
-		r = setsockopt(takion->sock, IPPROTO_IP, IP_MTU_DISCOVER, (const void *)&mtu_discover_val, sizeof(mtu_discover_val));
+			const int mtu_discover_val = IP_PMTUDISC_DO;
+			r = setsockopt(takion->sock, IPPROTO_IP, IP_MTU_DISCOVER, (const CHIAKI_SOCKET_BUF_TYPE)&mtu_discover_val, sizeof(mtu_discover_val));
 #else
-		// macOS and OpenBSD
-		CHIAKI_LOGW(takion->log, "Don't fragment is not supported on this platform, MTU values may be incorrect.");
+			// macOS older than MacOS Big Sur (11) and OpenBSD
+			CHIAKI_LOGW(takion->log, "Don't fragment is not supported on this platform, MTU values may be incorrect.");
 #define NO_DONTFRAG
 #endif
 
 #ifndef NO_DONTFRAG
+			if(r < 0 && mac_dontfrag)
+			{
+				CHIAKI_LOGE(takion->log, "Takion failed to setsockopt IP_MTU_DISCOVER: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
+				ret = CHIAKI_ERR_NETWORK;
+				goto error_sock;
+			}
+			CHIAKI_LOGI(takion->log, "Takion enabled Don't Fragment Bit");
+#endif
+		}
+		else
+		{
+#if defined(_WIN32)
+			const DWORD dontfragment_val = 0;
+			r = setsockopt(takion->sock, IPPROTO_IP, IP_DONTFRAGMENT, (const CHIAKI_SOCKET_BUF_TYPE)&dontfragment_val, sizeof(dontfragment_val));
+#elif defined(__FreeBSD__) || defined(__SWITCH__) || defined(__APPLE__)
+			if(mac_dontfrag)
+			{
+				const int dontfrag_val = 0;
+				r = setsockopt(takion->sock, IPPROTO_IP, IP_DONTFRAG, (const CHIAKI_SOCKET_BUF_TYPE)&dontfrag_val, sizeof(dontfrag_val));
+			}
+#elif defined(IP_PMTUDISC_DO)
+			const int mtu_discover_val = IP_PMTUDISC_DONT;
+			r = setsockopt(takion->sock, IPPROTO_IP, IP_MTU_DISCOVER, (const CHIAKI_SOCKET_BUF_TYPE)&mtu_discover_val, sizeof(mtu_discover_val));
+#else
+			// macOS older than MacOS Big Sur (11) and OpenBSD
+#define NO_DONTFRAG
+#endif
+
+#ifndef NO_DONTFRAG
+			if(r < 0 && mac_dontfrag)
+			{
+				CHIAKI_LOGE(takion->log, "Takion failed to unset setsockopt IP_MTU_DISCOVER: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
+				ret = CHIAKI_ERR_NETWORK;
+				goto error_sock;
+			}
+			CHIAKI_LOGI(takion->log, "Takion disabled Don't Fragment Bit");
+#endif
+		}
+	}
+	else
+	{
+		takion->sock = socket(info->sa->sa_family, SOCK_DGRAM, IPPROTO_UDP);
+		if(CHIAKI_SOCKET_IS_INVALID(takion->sock))
+		{
+			CHIAKI_LOGE(takion->log, "Takion failed to create socket");
+			ret = CHIAKI_ERR_NETWORK;
+			goto error_pipe;
+		}
+		const int rcvbuf_val = takion->a_rwnd;
+		int r = setsockopt(takion->sock, SOL_SOCKET, SO_RCVBUF, (const CHIAKI_SOCKET_BUF_TYPE)&rcvbuf_val, sizeof(rcvbuf_val));
 		if(r < 0)
 		{
-			CHIAKI_LOGE(takion->log, "Takion failed to setsockopt IP_MTU_DISCOVER: %s", strerror(errno));
+			CHIAKI_LOGE(takion->log, "Takion failed to setsockopt SO_RCVBUF: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
 			ret = CHIAKI_ERR_NETWORK;
 			goto error_sock;
 		}
-		CHIAKI_LOGI(takion->log, "Takion enabled Don't Fragment Bit");
+		if(info->ip_dontfrag)
+		{
+#if defined(__APPLE__)
+			SInt32 majorVersion;
+			Gestalt(gestaltSystemVersionMajor, &majorVersion);
+			if(majorVersion < 11)
+			{
+				mac_dontfrag = false;
+			}
 #endif
-	}
+#if defined(_WIN32)
+			const DWORD dontfragment_val = 1;
+			r = setsockopt(takion->sock, IPPROTO_IP, IP_DONTFRAGMENT, (const CHIAKI_SOCKET_BUF_TYPE)&dontfragment_val, sizeof(dontfragment_val));
+#elif defined(__FreeBSD__) || defined(__SWITCH__) || defined(__APPLE__)
+			const int dontfrag_val = 1;
+			r = setsockopt(takion->sock, IPPROTO_IP, IP_DONTFRAG, (const CHIAKI_SOCKET_BUF_TYPE)&dontfrag_val, sizeof(dontfrag_val));
+#elif defined(IP_PMTUDISC_DO)
+			if(mac_dontfrag)
+			{
+				const int mtu_discover_val = IP_PMTUDISC_DO;
+				r = setsockopt(takion->sock, IPPROTO_IP, IP_MTU_DISCOVER, (const CHIAKI_SOCKET_BUF_TYPE)&mtu_discover_val, sizeof(mtu_discover_val));
+			}
+			else
+				CHIAKI_LOGW(takion->log, "Don't fragment is not supported on this platform, MTU values may be incorrect.");
+#else
+			// macOS older than MacOS Big Sur (11) and OpenBSD
+			CHIAKI_LOGW(takion->log, "Don't fragment is not supported on this platform, MTU values may be incorrect.");
+#define NO_DONTFRAG
+#endif
 
-	// #ifdef __PSVITA__
-	// 	r = sceNetConnect(takion->sock, (SceNetSockaddr*)info->sa, info->sa_len);
-	// #else
+#ifndef NO_DONTFRAG
+			if(r < 0 && mac_dontfrag)
+			{
+				CHIAKI_LOGE(takion->log, "Takion failed to setsockopt IP_MTU_DISCOVER: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
+				ret = CHIAKI_ERR_NETWORK;
+				goto error_sock;
+			}
+			CHIAKI_LOGI(takion->log, "Takion enabled Don't Fragment Bit");
+#endif
+		}
+
 		r = connect(takion->sock, info->sa, info->sa_len);
-	// #endif
-	if(r < 0)
-	{
-		CHIAKI_LOGE(takion->log, "Takion failed to connect: %s", strerror(errno));
-		ret = CHIAKI_ERR_NETWORK;
-		goto error_sock;
+		if(r < 0)
+		{
+			CHIAKI_LOGE(takion->log, "Takion failed to connect: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
+			ret = CHIAKI_ERR_NETWORK;
+			goto error_sock;
+		}
+		if(r != CHIAKI_ERR_SUCCESS)
+		{
+			ret = err;
+			goto error_sock;
+		}
 	}
 
 	err = chiaki_thread_create(&takion->thread, takion_thread_func, takion);
-	if(r != CHIAKI_ERR_SUCCESS)
-	{
-		ret = err;
-		goto error_sock;
-	}
 
 	chiaki_thread_set_name(&takion->thread, "Chiaki Takion");
 
@@ -316,6 +414,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 
 error_sock:
 	CHIAKI_SOCKET_CLOSE(takion->sock);
+	takion->sock = CHIAKI_INVALID_SOCKET;
 error_pipe:
 	chiaki_stop_pipe_fini(&takion->stop_pipe);
 error_seq_num_local_mutex:
@@ -336,6 +435,7 @@ CHIAKI_EXPORT void chiaki_takion_close(ChiakiTakion *takion)
 
 CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_crypt_advance_key_pos(ChiakiTakion *takion, size_t data_size, uint64_t *key_pos)
 {
+	data_size += data_size % CHIAKI_GKCRYPT_BLOCK_SIZE;
 	ChiakiErrorCode err = chiaki_mutex_lock(&takion->gkcrypt_local_mutex);
 	if(err != CHIAKI_ERR_SUCCESS)
 		return err;
@@ -367,7 +467,10 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_send_raw(ChiakiTakion *takion, const
 		int r = send(takion->sock, buf, buf_size, 0);
 	// #endif
 	if(r < 0)
+	{
+		CHIAKI_LOGE(takion->log, "Takion failed to send raw: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
 		return CHIAKI_ERR_NETWORK;
+	}
 	return CHIAKI_ERR_SUCCESS;
 }
 
@@ -493,6 +596,53 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_send_message_data(ChiakiTakion *taki
 	return err;
 }
 
+CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_send_message_data_cont(ChiakiTakion *takion, uint8_t chunk_flags, uint16_t channel, uint8_t *buf, size_t buf_size, ChiakiSeqNum32 *seq_num)
+{
+	// TODO: can we make this more memory-efficient?
+	// TODO: split packet if necessary?
+
+	uint64_t key_pos;
+	ChiakiErrorCode err = chiaki_takion_crypt_advance_key_pos(takion, buf_size, &key_pos);
+	if(err != CHIAKI_ERR_SUCCESS)
+		return err;
+
+	size_t packet_size = 1 + TAKION_MESSAGE_HEADER_SIZE + 8 + buf_size;
+	uint8_t *packet_buf = malloc(packet_size);
+	if(!packet_buf)
+		return CHIAKI_ERR_MEMORY;
+	packet_buf[0] = TAKION_PACKET_TYPE_CONTROL;
+
+	takion_write_message_header(packet_buf + 1, takion->tag_remote, key_pos, TAKION_CHUNK_TYPE_DATA, chunk_flags, 8 + buf_size);
+
+	uint8_t *msg_payload = packet_buf + 1 + TAKION_MESSAGE_HEADER_SIZE;
+
+	err = chiaki_mutex_lock(&takion->seq_num_local_mutex);
+	if(err != CHIAKI_ERR_SUCCESS)
+		return err;
+	ChiakiSeqNum32 seq_num_val = takion->seq_num_local++;
+	chiaki_mutex_unlock(&takion->seq_num_local_mutex);
+
+	*((chiaki_unaligned_uint32_t *)(msg_payload + 0)) = htonl(seq_num_val);
+	*((chiaki_unaligned_uint16_t *)(msg_payload + 4)) = htons(channel);
+	*((chiaki_unaligned_uint16_t *)(msg_payload + 6)) = 0;
+	memcpy(msg_payload + 8, buf, buf_size);
+
+	err = chiaki_takion_send(takion, packet_buf, packet_size, key_pos); // will alter packet_buf with gmac
+	if(err != CHIAKI_ERR_SUCCESS)
+	{
+		CHIAKI_LOGE(takion->log, "Takion failed to send data packet: %s", chiaki_error_string(err));
+		free(packet_buf);
+		return err;
+	}
+
+	chiaki_takion_send_buffer_push(&takion->send_buffer, seq_num_val, packet_buf, packet_size);
+
+	if(seq_num)
+		*seq_num = seq_num_val;
+
+	return err;
+}
+
 static ChiakiErrorCode chiaki_takion_send_message_data_ack(ChiakiTakion *takion, uint32_t seq_num)
 {
 	uint8_t buf[1 + TAKION_MESSAGE_HEADER_SIZE + 0xc];
@@ -588,6 +738,38 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_send_feedback_state(ChiakiTakion *ta
 		chiaki_feedback_state_format_v12(buf + 0xc, feedback_state);
 	}
 	return takion_send_feedback_packet(takion, buf, buf_sz);
+}
+
+CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_send_mic_packet(ChiakiTakion *takion, uint8_t *buf, size_t buf_size, bool ps5)
+{
+	uint8_t ps5_packet = 0;
+	if(ps5)
+		ps5_packet = 1;
+	size_t payload_size = buf_size - 19 - ps5_packet;
+
+	ChiakiErrorCode err = chiaki_mutex_lock(&takion->gkcrypt_local_mutex);
+	if(err != CHIAKI_ERR_SUCCESS)
+		return err;
+	uint64_t key_pos;
+	err = chiaki_takion_crypt_advance_key_pos(takion, payload_size + CHIAKI_GKCRYPT_BLOCK_SIZE, &key_pos);
+	if(err != CHIAKI_ERR_SUCCESS)
+		goto beach;
+
+	err = chiaki_gkcrypt_encrypt(takion->gkcrypt_local, key_pos + CHIAKI_GKCRYPT_BLOCK_SIZE, buf + 19 + ps5_packet, payload_size);
+	if(err != CHIAKI_ERR_SUCCESS)
+		goto beach;
+
+	*((chiaki_unaligned_uint32_t *)(buf + 14)) = htonl((uint32_t)key_pos);
+
+	err = chiaki_gkcrypt_gmac(takion->gkcrypt_local, key_pos, buf, buf_size, buf + 10);
+
+	if(err != CHIAKI_ERR_SUCCESS)
+		goto beach;
+
+	chiaki_takion_send_raw(takion, buf, buf_size);
+beach:
+	chiaki_mutex_unlock(&takion->gkcrypt_local_mutex);
+	return err;
 }
 
 CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_send_feedback_history(ChiakiTakion *takion, ChiakiSeqNum16 seq_num, uint8_t *payload, size_t payload_size)
@@ -797,7 +979,11 @@ beach:
 		event.type = CHIAKI_TAKION_EVENT_TYPE_DISCONNECT;
 		takion->cb(&event, takion->cb_user);
 	}
-	CHIAKI_SOCKET_CLOSE(takion->sock);
+	if(takion->close_socket)
+	{
+		CHIAKI_SOCKET_CLOSE(takion->sock);
+		takion->sock = CHIAKI_INVALID_SOCKET;
+	}
 	return NULL;
 }
 
@@ -808,7 +994,7 @@ static ChiakiErrorCode takion_recv(ChiakiTakion *takion, uint8_t *buf, size_t *b
 		return err;
 	if(err != CHIAKI_ERR_SUCCESS)
 	{
-		CHIAKI_LOGE(takion->log, "Takion select failed: %s", strerror(errno));
+		CHIAKI_LOGE(takion->log, "Takion select failed: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
 		return err;
 	}
 
@@ -820,7 +1006,7 @@ static ChiakiErrorCode takion_recv(ChiakiTakion *takion, uint8_t *buf, size_t *b
 	if(received_sz <= 0)
 	{
 		if(received_sz < 0)
-			CHIAKI_LOGE(takion->log, "Takion recv failed: %s", strerror(errno));
+			CHIAKI_LOGE(takion->log, "Takion recv failed: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
 		else
 			CHIAKI_LOGE(takion->log, "Takion recv returned 0");
 		return CHIAKI_ERR_NETWORK;
@@ -1038,7 +1224,7 @@ static void takion_handle_packet_message_data_ack(ChiakiTakion *takion, uint8_t 
 {
 	if(buf_size != 0xc)
 	{
-		CHIAKI_LOGE(takion->log, "Takion received data ack with size %#x != %#x", buf_size, 0xa);
+		CHIAKI_LOGE(takion->log, "Takion received data ack with size %#x != %#x", buf_size, 0xc);
 		return;
 	}
 
@@ -1205,6 +1391,14 @@ static ChiakiErrorCode takion_recv_message_cookie_ack(ChiakiTakion *takion)
 	ChiakiErrorCode err = takion_recv(takion, message, &received_size, TAKION_EXPECT_TIMEOUT_MS);
 	if(err != CHIAKI_ERR_SUCCESS)
 		return err;
+
+	if(message[0xd] == TAKION_CHUNK_TYPE_INIT_ACK)
+	{
+		CHIAKI_LOGI(takion->log, "Received second init ack, looking for cookie ack in next message");
+		err = takion_recv(takion, message, &received_size, TAKION_EXPECT_TIMEOUT_MS);
+		if(err != CHIAKI_ERR_SUCCESS)
+			return err;
+	}
 
 	if(received_size < sizeof(message))
 	{
@@ -1468,4 +1662,23 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_v7_av_packet_parse(ChiakiTakionAVPac
 	packet->data_size = buf_size;
 
 	return CHIAKI_ERR_SUCCESS;
+}
+
+static ChiakiErrorCode takion_read_extra_sock_messages(ChiakiTakion *takion)
+{
+	// Stop trying after 1s
+	uint64_t expired = 1000 + chiaki_time_now_monotonic_ms();
+    while (true)
+    {
+		uint64_t now = chiaki_time_now_monotonic_ms();
+		if(now > expired)
+			return CHIAKI_ERR_TIMEOUT;
+		uint8_t buf[1500];
+		ChiakiErrorCode err = chiaki_stop_pipe_select_single(&takion->stop_pipe, takion->sock, false, 200);
+		if(err != CHIAKI_ERR_SUCCESS)
+			return err;
+        int len = recv(takion->sock, (CHIAKI_SOCKET_BUF_TYPE) buf, sizeof(buf), 0);
+        if (len < 0)
+            return CHIAKI_ERR_NETWORK;
+	}
 }

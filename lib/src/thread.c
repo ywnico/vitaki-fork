@@ -244,7 +244,6 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_mutex_unlock(ChiakiMutex *mutex)
 
 CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_init(ChiakiCond *cond, ChiakiMutex *mutex)
 {
-	cond->mutex = mutex;
 #if _WIN32
 	InitializeConditionVariable(&cond->cond);
 #elif defined(__PSVITA__)
@@ -292,10 +291,10 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_fini(ChiakiCond *cond)
 	return CHIAKI_ERR_SUCCESS;
 }
 
-CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_wait(ChiakiCond *cond)
+CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_wait(ChiakiCond *cond, ChiakiMutex *mutex)
 {
 #if _WIN32
-	int r = SleepConditionVariableCS(&cond->cond, &cond->mutex->cs, INFINITE);
+	int r = SleepConditionVariableCS(&cond->cond, &mutex->cs, INFINITE);
 	if(!r)
 		return CHIAKI_ERR_THREAD;
 #elif defined(__PSVITA__)
@@ -304,7 +303,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_wait(ChiakiCond *cond)
 		return CHIAKI_ERR_UNKNOWN;
 	}
 #else
-	int r = pthread_cond_wait(&cond->cond, &cond->mutex->mutex);
+	int r = pthread_cond_wait(&cond->cond, &mutex->mutex);
 	if(r != 0)
 		return CHIAKI_ERR_UNKNOWN;
 #endif
@@ -312,9 +311,9 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_wait(ChiakiCond *cond)
 }
 
 #if !__APPLE__ && !defined(_WIN32) && !defined(__PSVITA__)
-static ChiakiErrorCode chiaki_cond_timedwait_abs(ChiakiCond *cond, struct timespec *timeout)
+static ChiakiErrorCode chiaki_cond_timedwait_abs(ChiakiCond *cond, ChiakiMutex *mutex, struct timespec *timeout)
 {
-	int r = pthread_cond_timedwait(&cond->cond, &cond->mutex->mutex, timeout);
+	int r = pthread_cond_timedwait(&cond->cond, &mutex->mutex, timeout);
 	if(r != 0)
 	{
 		if(r == ETIMEDOUT)
@@ -343,10 +342,49 @@ static void set_timeout(struct timespec *timeout, uint64_t ms_from_now)
 }
 #endif
 
-CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_timedwait(ChiakiCond *cond, uint64_t timeout_ms)
+#if !__APPLE__
+CHIAKI_EXPORT ChiakiErrorCode chiaki_thread_timedjoin(ChiakiThread *thread, void **retval, uint64_t timeout_ms)
 {
 #if _WIN32
-	int r = SleepConditionVariableCS(&cond->cond, &cond->mutex->cs, (DWORD)timeout_ms);
+	int r = WaitForSingleObject(thread->thread, timeout_ms);
+	if(r != WAIT_OBJECT_0)
+		return CHIAKI_ERR_THREAD;
+	if(retval)
+		*retval = thread->ret;
+#elif defined(__PSVITA__)
+	// FIXME ywnico: check implementation
+	// Note: sceKernelWaitThreadEnd takes timeout in microseconds, not milliseconds
+	thread->timeout_us = timeout_ms * 1000;
+	int r = sceKernelWaitThreadEnd(thread->thread_id, 0, &thread->timeout_us);
+	if (r < 0) {
+		return CHIAKI_ERR_THREAD;
+	}
+	r = sceKernelDeleteThread(thread->thread_id);
+	if (r < 0) {
+		return CHIAKI_ERR_THREAD;
+	}
+	if (retval) {
+		*retval = thread->ret;
+	}
+#else
+	struct timespec timeout;
+	set_timeout(&timeout, timeout_ms);
+	int r = pthread_clockjoin_np(thread->thread, retval, CLOCK_MONOTONIC, &timeout);
+	if(r != 0)
+	{
+		if(r == ETIMEDOUT)
+			return CHIAKI_ERR_TIMEOUT;
+		return CHIAKI_ERR_THREAD;
+	}
+#endif
+	return CHIAKI_ERR_SUCCESS;
+}
+#endif
+
+CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_timedwait(ChiakiCond *cond, ChiakiMutex *mutex, uint64_t timeout_ms)
+{
+#if _WIN32
+	int r = SleepConditionVariableCS(&cond->cond, &mutex->cs, (DWORD)timeout_ms);
 	if(!r)
 	{
 		if(GetLastError() == ERROR_TIMEOUT)
@@ -368,7 +406,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_timedwait(ChiakiCond *cond, uint64_t t
 #if __APPLE__
 	timeout.tv_sec = (__darwin_time_t)(timeout_ms / 1000);
 	timeout.tv_nsec = (long)((timeout_ms % 1000) * 1000000);
-	int r = pthread_cond_timedwait_relative_np(&cond->cond, &cond->mutex->mutex, &timeout);
+	int r = pthread_cond_timedwait_relative_np(&cond->cond, &mutex->mutex, &timeout);
 	if(r != 0)
 	{
 		if(r == ETIMEDOUT)
@@ -378,23 +416,23 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_timedwait(ChiakiCond *cond, uint64_t t
 	return CHIAKI_ERR_SUCCESS;
 #else
 	set_timeout(&timeout, timeout_ms);
-	return chiaki_cond_timedwait_abs(cond, &timeout);
+	return chiaki_cond_timedwait_abs(cond, mutex, &timeout);
 #endif
 #endif
 }
 
-CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_wait_pred(ChiakiCond *cond, ChiakiCheckPred check_pred, void *check_pred_user)
+CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_wait_pred(ChiakiCond *cond, ChiakiMutex *mutex, ChiakiCheckPred check_pred, void *check_pred_user)
 {
 	while(!check_pred(check_pred_user))
 	{
-		ChiakiErrorCode err = chiaki_cond_wait(cond);
+		ChiakiErrorCode err = chiaki_cond_wait(cond, mutex);
 		if(err != CHIAKI_ERR_SUCCESS)
 			return err;
 	}
 	return CHIAKI_ERR_SUCCESS;
 }
 
-CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_timedwait_pred(ChiakiCond *cond, uint64_t timeout_ms, ChiakiCheckPred check_pred, void *check_pred_user)
+CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_timedwait_pred(ChiakiCond *cond, ChiakiMutex *mutex, uint64_t timeout_ms, ChiakiCheckPred check_pred, void *check_pred_user)
 {
 #if __APPLE__ || defined(_WIN32) || defined(__PSVITA__)
 	uint64_t start_time = chiaki_time_now_monotonic_ms();
@@ -406,9 +444,9 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_cond_timedwait_pred(ChiakiCond *cond, uint6
 	while(!check_pred(check_pred_user))
 	{
 #if __APPLE__ || defined(_WIN32) || defined(__PSVITA__)
-		ChiakiErrorCode err = chiaki_cond_timedwait(cond, timeout_ms - elapsed);
+		ChiakiErrorCode err = chiaki_cond_timedwait(cond, mutex, timeout_ms - elapsed);
 #else
-		ChiakiErrorCode err = chiaki_cond_timedwait_abs(cond, &timeout);
+		ChiakiErrorCode err = chiaki_cond_timedwait_abs(cond, mutex, &timeout);
 #endif
 		if(err != CHIAKI_ERR_SUCCESS)
 			return err;
@@ -504,12 +542,12 @@ bool bool_pred_cond_check_pred(void *user)
 
 CHIAKI_EXPORT ChiakiErrorCode chiaki_bool_pred_cond_wait(ChiakiBoolPredCond *cond)
 {
-	return chiaki_cond_wait_pred(&cond->cond, bool_pred_cond_check_pred, cond);
+	return chiaki_cond_wait_pred(&cond->cond, &cond->mutex, bool_pred_cond_check_pred, cond);
 }
 
 CHIAKI_EXPORT ChiakiErrorCode chiaki_bool_pred_cond_timedwait(ChiakiBoolPredCond *cond, uint64_t timeout_ms)
 {
-	return chiaki_cond_timedwait_pred(&cond->cond, timeout_ms, bool_pred_cond_check_pred, cond);
+	return chiaki_cond_timedwait_pred(&cond->cond, &cond->mutex, timeout_ms, bool_pred_cond_check_pred, cond);
 }
 
 CHIAKI_EXPORT ChiakiErrorCode chiaki_bool_pred_cond_signal(ChiakiBoolPredCond *cond)

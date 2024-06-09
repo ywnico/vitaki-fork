@@ -3,7 +3,6 @@
 #include <controllermanager.h>
 
 #include <QCoreApplication>
-#include <QMessageBox>
 #include <QByteArray>
 #include <QTimer>
 
@@ -74,6 +73,14 @@ static QSet<QPair<int16_t, int16_t>> chiaki_dualsense_controller_ids({
 	QPair<int16_t, int16_t>(0x054c, 0x0df2), // DualSense Edge controller
 });
 
+#ifdef CHIAKI_GUI_ENABLE_STEAMDECK_NATIVE
+static QSet<QPair<int16_t, int16_t>> chiaki_steamdeck_controller_ids({
+	// in format (vendor id, product id)
+	QPair<int16_t, int16_t>(0x28de, 0x1205), // Steam Deck
+	QPair<int16_t, int16_t>(0x28de, 0x11ff) // Steam Virtual Controller
+});
+#endif
+
 static ControllerManager *instance = nullptr;
 
 #define UPDATE_INTERVAL_MS 4
@@ -90,20 +97,11 @@ ControllerManager::ControllerManager(QObject *parent)
 {
 #ifdef CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
 	SDL_SetMainReady();
-#ifdef SDL_HINT_JOYSTICK_HIDAPI_PS4_RUMBLE
 	SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS4_RUMBLE, "1");
-#endif
-#ifdef SDL_HINT_JOYSTICK_HIDAPI_PS5_RUMBLE
 	SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_PS5_RUMBLE, "1");
-#endif
-#ifdef SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS
 	SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
-#endif
 	if(SDL_Init(SDL_INIT_GAMECONTROLLER) < 0)
-	{
-		const char *err = SDL_GetError();
-		QMessageBox::critical(nullptr, "SDL Init", tr("Failed to initialized SDL Gamecontroller: %1").arg(err ? err : ""));
-	}
+		return;
 
 	auto timer = new QTimer(this);
 	connect(timer, &QTimer::timeout, this, &ControllerManager::HandleEvents);
@@ -116,7 +114,17 @@ ControllerManager::ControllerManager(QObject *parent)
 ControllerManager::~ControllerManager()
 {
 #ifdef CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
+	for (Controller *controller : std::as_const(open_controllers))
+		delete controller;
+	open_controllers.clear();
 	SDL_Quit();
+#endif
+}
+
+void ControllerManager::SetButtonsByPos()
+{
+#ifdef CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
+	SDL_SetHint(SDL_HINT_GAMECONTROLLER_USE_BUTTON_LABELS, "0");
 #endif
 }
 
@@ -228,10 +236,13 @@ QSet<int> ControllerManager::GetAvailableControllers()
 
 Controller *ControllerManager::OpenController(int device_id)
 {
-	if(open_controllers.contains(device_id))
-		return nullptr;
-	auto controller = new Controller(device_id, this);
-	open_controllers[device_id] = controller;
+	Controller *controller = open_controllers.value(device_id);
+	if(!controller)
+	{
+		controller = new Controller(device_id, this);
+		open_controllers[device_id] = controller;
+	}
+	controller->Ref();
 	return controller;
 }
 
@@ -241,10 +252,11 @@ void ControllerManager::ControllerClosed(Controller *controller)
 }
 
 Controller::Controller(int device_id, ControllerManager *manager)
-	: QObject(manager), is_dualsense(false)
+: QObject(manager), ref(0), is_dualsense(false), is_steamdeck(false)
 {
 	this->id = device_id;
 	this->manager = manager;
+	this->micbutton_push = false;
 	chiaki_orientation_tracker_init(&this->orientation_tracker);
 	chiaki_controller_state_set_idle(&this->state);
 
@@ -263,6 +275,10 @@ Controller::Controller(int device_id, ControllerManager *manager)
 #endif
 			auto controller_id = QPair<int16_t, int16_t>(SDL_GameControllerGetVendor(controller), SDL_GameControllerGetProduct(controller));
 			is_dualsense = chiaki_dualsense_controller_ids.contains(controller_id);
+#ifdef CHIAKI_GUI_ENABLE_STEAMDECK_NATIVE
+			is_steamdeck = chiaki_steamdeck_controller_ids.contains(controller_id);
+			//printf("\nVendor ID: %x \nProduct ID: %x\n", controller_id.first, controller_id.second);
+#endif
 			break;
 		}
 	}
@@ -271,8 +287,9 @@ Controller::Controller(int device_id, ControllerManager *manager)
 
 Controller::~Controller()
 {
+	Q_ASSERT(ref == 0);
 #ifdef CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
-	if(controller)
+	if(controller && SDL_WasInit(SDL_INIT_GAMECONTROLLER)!=0)
 	{
 		// Clear trigger effects, SDL doesn't do it automatically
 		const uint8_t clear_effect[10] = { 0 };
@@ -280,7 +297,6 @@ Controller::~Controller()
 		SDL_GameControllerClose(controller);
 	}
 #endif
-	manager->ControllerClosed(this);
 }
 
 #ifdef CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
@@ -365,6 +381,9 @@ inline bool Controller::HandleButtonEvent(SDL_ControllerButtonEvent event) {
 		case SDL_CONTROLLER_BUTTON_GUIDE:
 			ps_btn = CHIAKI_CONTROLLER_BUTTON_PS;
 			break;
+		case SDL_CONTROLLER_BUTTON_MISC1:
+			micbutton_push = true;
+			break;
 #if SDL_VERSION_ATLEAST(2, 0, 14)
 		case SDL_CONTROLLER_BUTTON_TOUCHPAD:
 			ps_btn = CHIAKI_CONTROLLER_BUTTON_TOUCHPAD;
@@ -374,9 +393,20 @@ inline bool Controller::HandleButtonEvent(SDL_ControllerButtonEvent event) {
 			return false;
 		}
 	if(event.type == SDL_CONTROLLERBUTTONDOWN)
-		state.buttons |= ps_btn;
+	{
+		if(!micbutton_push)
+			state.buttons |= ps_btn;
+	}
 	else
-		state.buttons &= ~ps_btn;
+	{
+		if(micbutton_push)
+		{
+			micbutton_push = false;
+			emit MicButtonPush();
+		}
+		else
+			state.buttons &= ~ps_btn;
+	}
 	return true;
 }
 
@@ -442,13 +472,13 @@ inline bool Controller::HandleTouchpadEvent(SDL_ControllerTouchpadEvent event)
 		case SDL_CONTROLLERTOUCHPADDOWN:
 			if(touch_ids.size() >= CHIAKI_CONTROLLER_TOUCHES_MAX)
 				return false;
-			chiaki_id = chiaki_controller_state_start_touch(&state, event.x * PS_TOUCHPAD_MAX_X, event.y * PS_TOUCHPAD_MAX_Y);
+			chiaki_id = chiaki_controller_state_start_touch(&state, event.x * PS_TOUCHPAD_MAXX, event.y * PS_TOUCHPAD_MAXY);
 			touch_ids.insert(key, chiaki_id);
 			break;
 		case SDL_CONTROLLERTOUCHPADMOTION:
 			if(!exists)
 				return false;
-			chiaki_controller_state_set_touch_pos(&state, touch_ids[key], event.x * PS_TOUCHPAD_MAX_X, event.y * PS_TOUCHPAD_MAX_Y);
+			chiaki_controller_state_set_touch_pos(&state, touch_ids[key], event.x * PS_TOUCHPAD_MAXX, event.y * PS_TOUCHPAD_MAXY);
 			break;
 		case SDL_CONTROLLERTOUCHPADUP:
 			if(!exists)
@@ -463,6 +493,20 @@ inline bool Controller::HandleTouchpadEvent(SDL_ControllerTouchpadEvent event)
 }
 #endif
 #endif
+
+void Controller::Ref()
+{
+	ref++;
+}
+
+void Controller::Unref()
+{
+	if(--ref == 0)
+	{
+		manager->ControllerClosed(this);
+		deleteLater();
+	}
+}
 
 bool Controller::IsConnected()
 {
@@ -513,7 +557,7 @@ void Controller::SetRumble(uint8_t left, uint8_t right)
 
 void Controller::SetTriggerEffects(uint8_t type_left, const uint8_t *data_left, uint8_t type_right, const uint8_t *data_right)
 {
-#if defined(CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER) && SDL_VERSION_ATLEAST(2, 0, 16)
+#ifdef CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
 	if(!is_dualsense || !controller)
 		return;
 	DS5EffectsState_t state;
@@ -527,6 +571,37 @@ void Controller::SetTriggerEffects(uint8_t type_left, const uint8_t *data_left, 
 #endif
 }
 
+void Controller::SetDualsenseMic(bool on)
+{
+#ifdef CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
+	if(!is_dualsense || !controller)
+		return;
+	DS5EffectsState_t state;
+	SDL_zero(state);
+	state.ucEnableBits2 |= 0x01 /* mic light */ | 0x02 /* mic */;
+	if(on)
+	{
+		state.ucMicLightMode = 0x01;
+		state.ucAudioMuteBits = 0x08;
+	}
+	else
+	{
+		state.ucMicLightMode = 0x00;
+		state.ucAudioMuteBits = 0x00;
+	}
+	SDL_GameControllerSendEffect(controller, &state, sizeof(state));
+#endif
+}
+
+void Controller::SetHapticRumble(uint16_t left, uint16_t right, int ms)
+{
+#ifdef CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
+	if(!controller)
+		return;
+	SDL_GameControllerRumble(controller, left, right, ms);
+#endif
+}
+
 bool Controller::IsDualSense()
 {
 #ifdef CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
@@ -534,4 +609,15 @@ bool Controller::IsDualSense()
 		return false;
 	return is_dualsense;
 #endif
+	return false;
+}
+
+bool Controller::IsSteamDeck()
+{
+#ifdef CHIAKI_GUI_ENABLE_STEAMDECK_NATIVE
+	if(!controller)
+		return false;
+	return is_steamdeck;
+#endif
+	return false;
 }

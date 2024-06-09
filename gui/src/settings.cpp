@@ -2,6 +2,7 @@
 
 #include <settings.h>
 #include <QKeySequence>
+#include <QCoreApplication>
 
 #include <chiaki/config.h>
 
@@ -70,8 +71,11 @@ static void MigrateSettings(QSettings *settings)
 	}
 }
 
-Settings::Settings(QObject *parent) : QObject(parent)
+Settings::Settings(const QString &conf, QObject *parent) : QObject(parent),
+	time_format("yyyy-MM-dd  HH:mm:ss"),
+	settings(QCoreApplication::organizationName(), conf.isEmpty() ? QCoreApplication::applicationName() : QStringLiteral("%1-%2").arg(QCoreApplication::applicationName(), conf))
 {
+	settings.setFallbacksEnabled(false);
 	MigrateSettings(&settings);
 	manual_hosts_id_next = 0;
 	settings.setValue("version", SETTINGS_VERSION);
@@ -137,7 +141,8 @@ void Settings::SetBitrate(unsigned int bitrate)
 
 static const QMap<ChiakiCodec, QString> codecs = {
 	{ CHIAKI_CODEC_H264, "h264" },
-	{ CHIAKI_CODEC_H265, "h265" }
+	{ CHIAKI_CODEC_H265, "h265" },
+	{ CHIAKI_CODEC_H265_HDR, "h265_hdr" }
 };
 
 static const ChiakiCodec codec_default = CHIAKI_CODEC_H265;
@@ -145,7 +150,8 @@ static const ChiakiCodec codec_default = CHIAKI_CODEC_H265;
 ChiakiCodec Settings::GetCodec() const
 {
 	auto v = settings.value("settings/codec", codecs[codec_default]).toString();
-	return codecs.key(v, codec_default);
+	auto codec = codecs.key(v, codec_default);
+	return codec;
 }
 
 void Settings::SetCodec(ChiakiCodec codec)
@@ -155,7 +161,7 @@ void Settings::SetCodec(ChiakiCodec codec)
 
 unsigned int Settings::GetAudioBufferSizeDefault() const
 {
-	return 9600;
+	return 5760;
 }
 
 unsigned int Settings::GetAudioBufferSizeRaw() const
@@ -185,6 +191,62 @@ void Settings::SetDecoder(Decoder decoder)
 	settings.setValue("settings/decoder", decoder_values[decoder]);
 }
 
+static const QMap<PlaceboPreset, QString> placebo_preset_values = {
+	{ PlaceboPreset::Fast, "fast" },
+	{ PlaceboPreset::Default, "default" },
+	{ PlaceboPreset::HighQuality, "high_quality" }
+};
+
+PlaceboPreset Settings::GetPlaceboPreset() const
+{
+	auto v = settings.value("settings/placebo_preset", placebo_preset_values[PlaceboPreset::HighQuality]).toString();
+	return placebo_preset_values.key(v, PlaceboPreset::Default);
+}
+
+void Settings::SetPlaceboPreset(PlaceboPreset preset)
+{
+	settings.setValue("settings/placebo_preset", placebo_preset_values[preset]);
+}
+
+float Settings::GetZoomFactor() const
+{
+	return settings.value("settings/zoom_factor", -1).toFloat();
+}
+
+void Settings::SetZoomFactor(float factor)
+{
+	settings.setValue("settings/zoom_factor", factor);
+}
+
+static const QMap<WindowType, QString> window_type_values = {
+	{ WindowType::SelectedResolution, "Selected Resolution" },
+	{ WindowType::Fullscreen, "Fullscreen" },
+	{ WindowType::Zoom, "Zoom" },
+	{ WindowType::Stretch, "Stretch" }
+};
+
+WindowType Settings::GetWindowType() const
+{
+	auto v = settings.value("settings/window_type", window_type_values[WindowType::SelectedResolution]).toString();
+	return window_type_values.key(v, WindowType::SelectedResolution);
+}
+
+void Settings::SetWindowType(WindowType type)
+{
+	settings.setValue("settings/window_type", window_type_values[type]);
+}
+
+RegisteredHost Settings::GetAutoConnectHost() const
+{
+	const QByteArray mac = settings.value("settings/auto_connect_mac").toByteArray();
+	return GetRegisteredHost(mac.size() == 6 ? HostMAC((const uint8_t *)mac.constData()) : HostMAC());
+}
+
+void Settings::SetAutoConnectHost(const QByteArray &mac)
+{
+	settings.setValue("settings/auto_connect_mac", mac);
+}
+
 QString Settings::GetHardwareDecoder() const
 {
 	return settings.value("settings/hw_decoder").toString();
@@ -206,14 +268,107 @@ QString Settings::GetAudioOutDevice() const
 	return settings.value("settings/audio_out_device").toString();
 }
 
+QString Settings::GetAudioInDevice() const
+{
+	return settings.value("settings/audio_in_device").toString();
+}
+
 void Settings::SetAudioOutDevice(QString device_name)
 {
 	settings.setValue("settings/audio_out_device", device_name);
 }
 
+void Settings::SetAudioInDevice(QString device_name)
+{
+	settings.setValue("settings/audio_in_device", device_name);
+}
+
 void Settings::SetAudioBufferSize(unsigned int size)
 {
 	settings.setValue("settings/audio_buffer_size", size);
+}
+
+unsigned int Settings::GetWifiDroppedNotif() const
+{
+	return settings.value("settings/wifi_dropped_notif_percent", 3).toUInt();
+}
+
+void Settings::SetWifiDroppedNotif(unsigned int percent)
+{
+	settings.setValue("settings/wifi_dropped_notif_percent", percent);
+}
+
+#if CHIAKI_GUI_ENABLE_SPEEX
+
+bool Settings::GetSpeechProcessingEnabled() const
+{
+	return settings.value("settings/enable_speech_processing", false).toBool();
+}
+
+int Settings::GetNoiseSuppressLevel() const
+{
+	return settings.value("settings/noise_suppress_level", 6).toInt();
+}
+
+int Settings::GetEchoSuppressLevel() const
+{
+	return settings.value("settings/echo_suppress_level", 30).toInt();
+}
+
+void Settings::SetSpeechProcessingEnabled(bool enabled)
+{
+	settings.setValue("settings/enable_speech_processing", enabled);
+}
+
+void Settings::SetNoiseSuppressLevel(int reduceby)
+{
+	settings.setValue("settings/noise_suppress_level", reduceby);
+}
+
+void Settings::SetEchoSuppressLevel(int reduceby)
+{
+	settings.setValue("settings/echo_suppress_level", reduceby);
+}
+#endif
+
+QString Settings::GetPsnAuthToken() const
+{
+	return settings.value("settings/psn_auth_token").toString();
+}
+
+void Settings::SetPsnAuthToken(QString auth_token)
+{
+	settings.setValue("settings/psn_auth_token", auth_token);
+}
+
+QString Settings::GetPsnRefreshToken() const
+{
+	return settings.value("settings/psn_refresh_token").toString();
+}
+
+void Settings::SetPsnRefreshToken(QString refresh_token)
+{
+	settings.setValue("settings/psn_refresh_token", refresh_token);
+}
+
+QString Settings::GetPsnAuthTokenExpiry() const
+{
+	return settings.value("settings/psn_auth_token_expiry").toString();
+}
+
+void Settings::SetPsnAuthTokenExpiry(QString expiry_date)
+{
+	settings.setValue("settings/psn_auth_token_expiry", expiry_date);
+}
+
+QString Settings::GetPsnAccountId() const
+{
+	return settings.value("settings/psn_account_id").toString();
+}
+
+void Settings::SetPsnAccountId(QString account_id)
+{
+	settings.setValue("settings/psn_account_id", account_id);
 }
 
 ChiakiConnectVideoProfile Settings::GetVideoProfile()
@@ -246,9 +401,29 @@ void Settings::SetDisconnectAction(DisconnectAction action)
 	settings.setValue("settings/disconnect_action", disconnect_action_values[action]);
 }
 
+static const QMap<SuspendAction, QString> suspend_action_values = {
+	{ SuspendAction::Sleep, "sleep" },
+	{ SuspendAction::Nothing, "nothing" },
+};
+
+static const SuspendAction suspend_action_default = SuspendAction::Nothing;
+
+SuspendAction Settings::GetSuspendAction()
+{
+	auto v = settings.value("settings/suspend_action", suspend_action_values[suspend_action_default]).toString();
+	return suspend_action_values.key(v, suspend_action_default);
+}
+
+void Settings::SetSuspendAction(SuspendAction action)
+{
+	settings.setValue("settings/suspend_action", suspend_action_values[action]);
+}
+
 void Settings::LoadRegisteredHosts()
 {
 	registered_hosts.clear();
+	nickname_registered_hosts.clear();
+	ps4s_registered = 0;
 
 	int count = settings.beginReadArray("registered_hosts");
 	for(int i=0; i<count; i++)
@@ -256,6 +431,9 @@ void Settings::LoadRegisteredHosts()
 		settings.setArrayIndex(i);
 		RegisteredHost host = RegisteredHost::LoadFromSettings(&settings);
 		registered_hosts[host.GetServerMAC()] = host;
+		nickname_registered_hosts[host.GetServerNickname()] = host;
+		if(!chiaki_target_is_ps5(host.GetTarget()))
+			ps4s_registered++;
 	}
 	settings.endArray();
 }
@@ -419,10 +597,53 @@ QMap<int, Qt::Key> Settings::GetControllerMapping()
 	{
 		auto button_name = GetChiakiControllerButtonName(chiaki_button).replace(' ', '_').toLower();
 		if(settings.contains("keymap/" + button_name))
-			result[static_cast<int>(chiaki_button)] = Qt::Key(QKeySequence(settings.value("keymap/" + button_name).toString())[0]);
+			result[static_cast<int>(chiaki_button)] = QKeySequence(settings.value("keymap/" + button_name).toString())[0].key();
 	}
 
 	return result;
+}
+
+void Settings::ClearKeyMapping()
+{
+	// Initialize with default values
+	QMap<int, Qt::Key> result =
+	{
+		{CHIAKI_CONTROLLER_BUTTON_CROSS     , Qt::Key::Key_Return},
+		{CHIAKI_CONTROLLER_BUTTON_MOON      , Qt::Key::Key_Backspace},
+		{CHIAKI_CONTROLLER_BUTTON_BOX       , Qt::Key::Key_Backslash},
+		{CHIAKI_CONTROLLER_BUTTON_PYRAMID   , Qt::Key::Key_C},
+		{CHIAKI_CONTROLLER_BUTTON_DPAD_LEFT , Qt::Key::Key_Left},
+		{CHIAKI_CONTROLLER_BUTTON_DPAD_RIGHT, Qt::Key::Key_Right},
+		{CHIAKI_CONTROLLER_BUTTON_DPAD_UP   , Qt::Key::Key_Up},
+		{CHIAKI_CONTROLLER_BUTTON_DPAD_DOWN , Qt::Key::Key_Down},
+		{CHIAKI_CONTROLLER_BUTTON_L1        , Qt::Key::Key_2},
+		{CHIAKI_CONTROLLER_BUTTON_R1        , Qt::Key::Key_3},
+		{CHIAKI_CONTROLLER_BUTTON_L3        , Qt::Key::Key_5},
+		{CHIAKI_CONTROLLER_BUTTON_R3        , Qt::Key::Key_6},
+		{CHIAKI_CONTROLLER_BUTTON_OPTIONS   , Qt::Key::Key_O},
+		{CHIAKI_CONTROLLER_BUTTON_SHARE     , Qt::Key::Key_F},
+		{CHIAKI_CONTROLLER_BUTTON_TOUCHPAD  , Qt::Key::Key_T},
+		{CHIAKI_CONTROLLER_BUTTON_PS        , Qt::Key::Key_Escape},
+		{CHIAKI_CONTROLLER_ANALOG_BUTTON_L2 , Qt::Key::Key_1},
+		{CHIAKI_CONTROLLER_ANALOG_BUTTON_R2 , Qt::Key::Key_4},
+		{static_cast<int>(ControllerButtonExt::ANALOG_STICK_LEFT_X_UP)   , Qt::Key::Key_BracketRight},
+		{static_cast<int>(ControllerButtonExt::ANALOG_STICK_LEFT_X_DOWN) , Qt::Key::Key_BracketLeft},
+		{static_cast<int>(ControllerButtonExt::ANALOG_STICK_LEFT_Y_UP)   , Qt::Key::Key_Insert},
+		{static_cast<int>(ControllerButtonExt::ANALOG_STICK_LEFT_Y_DOWN) , Qt::Key::Key_Delete},
+		{static_cast<int>(ControllerButtonExt::ANALOG_STICK_RIGHT_X_UP)  , Qt::Key::Key_Equal},
+		{static_cast<int>(ControllerButtonExt::ANALOG_STICK_RIGHT_X_DOWN), Qt::Key::Key_Minus},
+		{static_cast<int>(ControllerButtonExt::ANALOG_STICK_RIGHT_Y_UP)  , Qt::Key::Key_PageUp},
+		{static_cast<int>(ControllerButtonExt::ANALOG_STICK_RIGHT_Y_DOWN), Qt::Key::Key_PageDown}
+	};
+
+	// Then fill in from settings
+	auto chiaki_buttons = result.keys();
+	for(auto chiaki_button : chiaki_buttons)
+	{
+		auto button_name = GetChiakiControllerButtonName(chiaki_button).replace(' ', '_').toLower();
+		if(settings.contains("keymap/" + button_name))
+			settings.remove("keymap/" + button_name);
+	}
 }
 
 QMap<Qt::Key, int> Settings::GetControllerMappingForDecoding()

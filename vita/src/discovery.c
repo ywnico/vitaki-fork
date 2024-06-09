@@ -144,6 +144,7 @@ ChiakiErrorCode start_discovery(VitaChiakiDiscoveryCb cb, void* cb_user) {
   opts.cb = discovery_cb;
   opts.cb_user = context.discovery_cb_state;
   opts.ping_ms = 500;
+  opts.ping_initial_ms = opts.ping_ms;
   opts.hosts_max = MAX_NUM_HOSTS;
   opts.host_drop_pings = HOST_DROP_PINGS;
 
@@ -152,6 +153,7 @@ ChiakiErrorCode start_discovery(VitaChiakiDiscoveryCb cb, void* cb_user) {
   addr.sin_addr.s_addr = INADDR_BROADCAST;
   opts.send_addr = (struct sockaddr*) &addr;
   opts.send_addr_size = sizeof(addr);
+  opts.send_host = NULL;
 
   ChiakiErrorCode err = chiaki_discovery_service_init(&(context.discovery),
                                                       &opts, &(context.log));

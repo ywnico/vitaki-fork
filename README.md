@@ -1,18 +1,19 @@
-
-![Chiaki Logo](assets/chiaki_wide.png)
-
 # Vitaki fork notes
 
 This is ywnico's fork of [aa's Vitaki](https://git.catvibers.me/aa/chiaki) with the following updates:
 1. Fixed audio
 2. Includes [ghost's LiveArea icon fixes](https://git.catvibers.me/aa/chiaki/pulls/13)
-3. Updated from upstream Chiaki (may have improved some connection issues)
+3. Merged in updates from chiaki4deck (may have improved some connection issues)
 
 # Chiaki
 
-**Disclaimer:** This project is not endorsed or certified by Sony Interactive Entertainment LLC.
+## [chiaki4deck](https://streetpea.github.io/chiaki4deck/)
 
-[![AppVeyor Build status](https://ci.appveyor.com/api/projects/status/c81ogebvsmo43dd3?svg=true)](https://ci.appveyor.com/project/thestr4ng3r/chiaki) [![builds.sr.ht Status](https://builds.sr.ht/~thestr4ng3r/chiaki.svg)](https://builds.sr.ht/~thestr4ng3r/chiaki?)
+![chiaki4deck Logo](gui/chiaki4deck.png)
+
+An open source project looking to help users of the Steam Deck get the most out of Chiaki. [Click here to see the accompanying site for documentation, updates and more](https://streetpea.github.io/chiaki4deck/). 
+
+**Disclaimer:** This project is not endorsed or certified by Sony Interactive Entertainment LLC.
 
 Chiaki is a Free and Open Source Software Client for PlayStation 4 and PlayStation 5 Remote Play
 for Linux, FreeBSD, OpenBSD, NetBSD, Android, macOS, Windows, Nintendo Switch and potentially even more platforms.

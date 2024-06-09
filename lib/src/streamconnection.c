@@ -50,6 +50,7 @@ static void stream_connection_takion_data_rumble(ChiakiStreamConnection *stream_
 static void stream_connection_takion_data_trigger_effects(ChiakiStreamConnection *stream_connection, uint8_t *buf, size_t buf_size);
 static ChiakiErrorCode stream_connection_send_big(ChiakiStreamConnection *stream_connection);
 static ChiakiErrorCode stream_connection_send_controller_connection(ChiakiStreamConnection *stream_connection);
+static ChiakiErrorCode stream_connection_enable_microphone(ChiakiStreamConnection *stream_connection);
 static ChiakiErrorCode stream_connection_send_disconnect(ChiakiStreamConnection *stream_connection);
 static void stream_connection_takion_data_idle(ChiakiStreamConnection *stream_connection, uint8_t *buf, size_t buf_size);
 static void stream_connection_takion_data_expect_bang(ChiakiStreamConnection *stream_connection, uint8_t *buf, size_t buf_size);
@@ -114,6 +115,12 @@ CHIAKI_EXPORT void chiaki_stream_connection_fini(ChiakiStreamConnection *stream_
 	chiaki_gkcrypt_free(stream_connection->gkcrypt_local);
 
 	free(stream_connection->ecdh_secret);
+#if defined(__PSVITA__)
+	if (stream_connection->congestion_control.thread.thread_id)
+#else
+	if (stream_connection->congestion_control.thread.thread)
+#endif
+		chiaki_congestion_control_stop(&stream_connection->congestion_control);
 
 	chiaki_packet_stats_fini(&stream_connection->packet_stats);
 
@@ -129,20 +136,24 @@ static bool state_finished_cond_check(void *user)
 	return stream_connection->state_finished || stream_connection->should_stop || stream_connection->remote_disconnected;
 }
 
-CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnection *stream_connection)
+CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnection *stream_connection, chiaki_socket_t *socket)
 {
 	ChiakiSession *session = stream_connection->session;
 	ChiakiErrorCode err;
 
 	ChiakiTakionConnectInfo takion_info;
 	takion_info.log = stream_connection->log;
-	takion_info.sa_len = session->connect_info.host_addrinfo_selected->ai_addrlen;
-	takion_info.sa = malloc(takion_info.sa_len);
-	if(!takion_info.sa)
-		return CHIAKI_ERR_MEMORY;
-	memcpy(takion_info.sa, session->connect_info.host_addrinfo_selected->ai_addr, takion_info.sa_len);
-	err = set_port(takion_info.sa, htons(STREAM_CONNECTION_PORT));
-	assert(err == CHIAKI_ERR_SUCCESS);
+	takion_info.close_socket = true;
+	if(!socket)
+	{
+		takion_info.sa_len = session->connect_info.host_addrinfo_selected->ai_addrlen;
+		takion_info.sa = malloc(takion_info.sa_len);
+		if(!takion_info.sa)
+			return CHIAKI_ERR_MEMORY;
+		memcpy(takion_info.sa, session->connect_info.host_addrinfo_selected->ai_addr, takion_info.sa_len);
+		err = set_port(takion_info.sa, htons(STREAM_CONNECTION_PORT));
+		assert(err == CHIAKI_ERR_SUCCESS);
+	}
 	takion_info.ip_dontfrag = false;
 
 	takion_info.enable_crypt = true;
@@ -187,9 +198,10 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnectio
 	stream_connection->state = STATE_TAKION_CONNECT;
 	stream_connection->state_finished = false;
 	stream_connection->state_failed = false;
-	takion_info.log = session->log;
-	err = chiaki_takion_connect(&stream_connection->takion, &takion_info);
-	free(takion_info.sa);
+	err = chiaki_takion_connect(&stream_connection->takion, &takion_info, socket);
+	if(!socket)
+		free(takion_info.sa);
+
 	if(err != CHIAKI_ERR_SUCCESS)
 	{
 		CHIAKI_LOGE(session->log, "StreamConnection connect failed %d", err);
@@ -197,15 +209,14 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnectio
 		goto err_video_receiver;
 	}
 
-	ChiakiCongestionControl congestion_control;
-	err = chiaki_congestion_control_start(&congestion_control, &stream_connection->takion, &stream_connection->packet_stats);
+	err = chiaki_congestion_control_start(&stream_connection->congestion_control, &stream_connection->takion, &stream_connection->packet_stats);
 	if(err != CHIAKI_ERR_SUCCESS)
 	{
 		CHIAKI_LOGE(session->log, "StreamConnection failed to start Congestion Control");
 		goto close_takion;
 	}
 
-	err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, EXPECT_TIMEOUT_MS, state_finished_cond_check, stream_connection);
+	err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, &stream_connection->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, stream_connection);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 	CHECK_STOP(close_takion);
 	if(err != CHIAKI_ERR_SUCCESS)
@@ -226,7 +237,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnectio
 		goto disconnect;
 	}
 
-	err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, EXPECT_TIMEOUT_MS, state_finished_cond_check, stream_connection);
+	err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, &stream_connection->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, stream_connection);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 	CHECK_STOP(disconnect);
 
@@ -245,7 +256,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnectio
 	stream_connection->state = STATE_EXPECT_STREAMINFO;
 	stream_connection->state_finished = false;
 	stream_connection->state_failed = false;
-	err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, EXPECT_TIMEOUT_MS, state_finished_cond_check, stream_connection);
+	err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, &stream_connection->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, stream_connection);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 	CHECK_STOP(disconnect);
 
@@ -287,7 +298,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnectio
 
 	while(true)
 	{
-		err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, HEARTBEAT_INTERVAL_MS, state_finished_cond_check, stream_connection);
+		err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, &stream_connection->state_mutex, HEARTBEAT_INTERVAL_MS, state_finished_cond_check, stream_connection);
 		if(err != CHIAKI_ERR_TIMEOUT)
 			break;
 
@@ -322,7 +333,7 @@ disconnect:
 	}
 
 err_congestion_control:
-	chiaki_congestion_control_stop(&congestion_control);
+	chiaki_congestion_control_stop(&stream_connection->congestion_control);
 
 close_takion:
 	chiaki_mutex_unlock(&stream_connection->state_mutex);
@@ -501,8 +512,37 @@ static void stream_connection_takion_data_idle(ChiakiStreamConnection *stream_co
 	CHIAKI_LOGV(stream_connection->log, "StreamConnection received data with msg.type == %d", msg.type);
 	chiaki_log_hexdump(stream_connection->log, CHIAKI_LOG_VERBOSE, buf, buf_size);
 
-	if(msg.type == tkproto_TakionMessage_PayloadType_DISCONNECT)
+	switch (msg.type)
+	{
+	case tkproto_TakionMessage_PayloadType_DISCONNECT:
 		stream_connection_takion_data_handle_disconnect(stream_connection, buf, buf_size);
+		break;
+	case tkproto_TakionMessage_PayloadType_CONNECTIONQUALITY:
+	{
+		tkproto_ConnectionQualityPayload q = msg.connection_quality_payload;
+		CHIAKI_LOGV(
+			stream_connection->log,
+			"StreamConnection received connection quality: target_bitrate=%d, "
+			"upstream_bitrate=%d, upstream_loss=%.4f, "
+			"disable_upstream_audio=%d, rtt=%.4f, loss=%lld",
+			 q.target_bitrate, q.upstream_bitrate,
+			 q.upstream_loss,
+			 q.disable_upstream_audio, q.rtt, q.loss);
+		stream_connection->measured_bitrate = chiaki_stream_stats_bitrate(&stream_connection->video_receiver->frame_processor.stream_stats, stream_connection->session->connect_info.video_profile.max_fps) / 1000000.0;
+		CHIAKI_LOGV(stream_connection->log, "StreamConnection measured bitrate: %.4f MBit/s", stream_connection->measured_bitrate);
+		chiaki_stream_stats_reset(&stream_connection->video_receiver->frame_processor.stream_stats);
+		break;
+	}
+	case tkproto_TakionMessage_PayloadType_CORRUPTFRAME:
+		CHIAKI_LOGE(stream_connection->log, "StreamConnection received corrupt frame from %d to %d",
+			msg.corrupt_payload.start, msg.corrupt_payload.end);
+		break;
+	case tkproto_TakionMessage_PayloadType_STREAMINFOACK:
+		CHIAKI_LOGV(stream_connection->log, "StreamConnection received streaminfo ack");
+		break;
+	default:
+		break;
+	}
 }
 
 static ChiakiErrorCode stream_connection_init_crypt(ChiakiStreamConnection *stream_connection)
@@ -623,12 +663,6 @@ static void stream_connection_takion_data_expect_bang(ChiakiStreamConnection *st
 	// stream_connection->state_mutex is expected to be locked by the caller of this function
 	stream_connection->state_finished = true;
 	chiaki_cond_signal(&stream_connection->state_cond);
-	err = stream_connection_send_controller_connection(stream_connection);
-	if(err != CHIAKI_ERR_SUCCESS)
-	{
-		CHIAKI_LOGE(stream_connection->log, "StreamConnection failed to send controller connection");
-		goto error;
-	}
 	return;
 error:
 	stream_connection->state_failed = true;
@@ -742,6 +776,20 @@ static void stream_connection_takion_data_expect_streaminfo(ChiakiStreamConnecti
 	// TODO: do some checks?
 
 	stream_connection_send_streaminfo_ack(stream_connection);
+	
+	ChiakiErrorCode err = stream_connection_send_controller_connection(stream_connection);
+	if(err != CHIAKI_ERR_SUCCESS)
+	{
+		CHIAKI_LOGE(stream_connection->log, "StreamConnection failed to send controller connection");
+		goto error;
+	}
+
+	err = stream_connection_enable_microphone(stream_connection);
+	if(err != CHIAKI_ERR_SUCCESS)
+	{
+		CHIAKI_LOGE(stream_connection->log, "StreamConnection failed to enable microphone input");
+		goto error;
+	}
 
 	// stream_connection->state_mutex is expected to be locked by the caller of this function
 	stream_connection->state_finished = true;
@@ -852,9 +900,35 @@ static ChiakiErrorCode stream_connection_send_big(ChiakiStreamConnection *stream
 		return CHIAKI_ERR_UNKNOWN;
 	}
 
-	buf_size = stream.bytes_written;
-	err = chiaki_takion_send_message_data(&stream_connection->takion, 1, 1, buf, buf_size, NULL);
-
+	int32_t total_size = stream.bytes_written;
+	uint32_t mtu = (session->mtu_in < session->mtu_out) ? session->mtu_in : session->mtu_out;
+	// Take into account overhead of network
+	mtu -= 50;
+	uint32_t buf_pos = 0;
+	bool first = true;
+	while((mtu < total_size + 26) || (mtu < total_size + 25 && !first))
+	{
+		if(first)
+		{
+			buf_size = mtu - 26;
+			err = chiaki_takion_send_message_data(&stream_connection->takion, 0, 1, buf + buf_pos, buf_size, NULL);
+			first = false;
+		}
+		else
+		{
+			buf_size = mtu - 25;
+			err = chiaki_takion_send_message_data_cont(&stream_connection->takion, 0, 1, buf + buf_pos, buf_size, NULL);
+		}
+		buf_pos += buf_size;
+		total_size -= buf_size;
+	}
+	if(total_size > 0)
+	{
+		if(first)
+		  err = chiaki_takion_send_message_data(&stream_connection->takion, 1, 1, buf + buf_pos, total_size, NULL);
+		else
+		  err = chiaki_takion_send_message_data_cont(&stream_connection->takion, 1, 1, buf + buf_pos, total_size, NULL);
+	}
 	return err;
 }
 
@@ -873,6 +947,41 @@ static ChiakiErrorCode stream_connection_send_controller_connection(ChiakiStream
 	msg.controller_connection_payload.controller_type = session->connect_info.enable_dualsense
 		? tkproto_ControllerConnectionPayload_ControllerType_DUALSENSE
 		: tkproto_ControllerConnectionPayload_ControllerType_DUALSHOCK4;
+
+	uint8_t buf[2048];
+	size_t buf_size;
+
+	pb_ostream_t stream = pb_ostream_from_buffer(buf, sizeof(buf));
+	bool pbr = pb_encode(&stream, tkproto_TakionMessage_fields, &msg);
+	if(!pbr)
+	{
+		CHIAKI_LOGE(stream_connection->log, "StreamConnection controller connection protobuf encoding failed");
+		return CHIAKI_ERR_UNKNOWN;
+	}
+
+	buf_size = stream.bytes_written;
+	return chiaki_takion_send_message_data(&stream_connection->takion, 1, 1, buf, buf_size, NULL);
+}
+
+static ChiakiErrorCode stream_connection_enable_microphone(ChiakiStreamConnection *stream_connection)
+{
+	tkproto_TakionMessage msg;
+	memset(&msg, 0, sizeof(msg));
+
+	ChiakiAudioHeader audio_header_input;
+	chiaki_audio_header_set(&audio_header_input, 16, 1, 48000, 480);
+	uint8_t audio_header[CHIAKI_AUDIO_HEADER_SIZE];
+	chiaki_audio_header_save(&audio_header_input, audio_header);
+	ChiakiPBBuf audio_header_buf = { sizeof(audio_header), (uint8_t *)audio_header };
+
+	msg.type = tkproto_TakionMessage_PayloadType_STREAMINFO;
+	msg.has_stream_info_payload = true;
+	msg.stream_info_payload.audio_header.arg = &audio_header_buf;
+	msg.stream_info_payload.audio_header.funcs.encode = chiaki_pb_encode_buf;
+	msg.stream_info_payload.has_start_timeout = false;
+	msg.stream_info_payload.has_afk_timeout = false;
+	msg.stream_info_payload.has_afk_timeout_disconnect = false;
+	msg.stream_info_payload.has_congestion_control_interval = false;
 
 	uint8_t buf[2048];
 	size_t buf_size;

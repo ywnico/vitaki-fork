@@ -40,6 +40,7 @@ target_link_libraries(${VITA_APP_NAME}.elf
   ssl
   crypto
   opus
+  curl
 
   freetype
   bz2

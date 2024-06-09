@@ -3,14 +3,13 @@
 int real_main(int argc, char *argv[]);
 int main(int argc, char *argv[]) { return real_main(argc, argv); }
 
-#include <streamwindow.h>
-#include <mainwindow.h>
 #include <streamsession.h>
 #include <settings.h>
-#include <registdialog.h>
 #include <host.h>
-#include <avopenglwidget.h>
 #include <controllermanager.h>
+#include <discoverymanager.h>
+#include <qmlmainwindow.h>
+#include <QGuiApplication>
 
 #ifdef CHIAKI_ENABLE_CLI
 #include <chiaki-cli.h>
@@ -23,14 +22,17 @@ int main(int argc, char *argv[]) { return real_main(argc, argv); }
 #include <stdio.h>
 #include <string.h>
 
-#include <QApplication>
-#include <QAudioOutput>
-#include <QAudioFormat>
 #include <QCommandLineParser>
 #include <QMap>
 #include <QSurfaceFormat>
 
 Q_DECLARE_METATYPE(ChiakiLogLevel)
+Q_DECLARE_METATYPE(ChiakiRegistEventType)
+
+#if defined(CHIAKI_GUI_ENABLE_STEAMDECK_NATIVE) && defined(Q_OS_LINUX)
+#include <QtPlugin>
+Q_IMPORT_PLUGIN(SDInputContextPlugin)
+#endif
 
 #ifdef CHIAKI_ENABLE_CLI
 struct CLICommand
@@ -44,8 +46,8 @@ static const QMap<QString, CLICommand> cli_commands = {
 };
 #endif
 
-int RunStream(QApplication &app, const StreamSessionConnectInfo &connect_info);
-int RunMain(QApplication &app, Settings *settings);
+int RunStream(QGuiApplication &app, const StreamSessionConnectInfo &connect_info);
+int RunMain(QGuiApplication &app, Settings *settings);
 
 int real_main(int argc, char *argv[])
 {
@@ -56,8 +58,21 @@ int real_main(int argc, char *argv[])
 	qRegisterMetaType<ChiakiRegistEventType>();
 	qRegisterMetaType<ChiakiLogLevel>();
 
-	QApplication::setOrganizationName("Chiaki");
-	QApplication::setApplicationName("Chiaki");
+	QGuiApplication::setOrganizationName("Chiaki");
+	QGuiApplication::setApplicationName("Chiaki");
+	QGuiApplication::setApplicationVersion(CHIAKI_VERSION);
+	QGuiApplication::setApplicationDisplayName("chiaki4deck");
+	QGuiApplication::setDesktopFileName("chiaki4deck");
+
+	qputenv("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu");
+#if defined(Q_OS_WIN)
+	QString import_path = QFileInfo(argv[0]).dir().absolutePath() + "/qml";
+	qputenv("QML_IMPORT_PATH", import_path.toUtf8());
+#endif
+#ifdef CHIAKI_GUI_ENABLE_STEAMDECK_NATIVE
+	if (qEnvironmentVariableIsSet("SteamDeck") || qEnvironmentVariable("DESKTOP_SESSION").contains("steamos"))
+		qputenv("QT_IM_MODULE", "sdinput");
+#endif
 
 	ChiakiErrorCode err = chiaki_lib_init();
 	if(err != CHIAKI_ERR_SUCCESS)
@@ -66,25 +81,28 @@ int real_main(int argc, char *argv[])
 		return 1;
 	}
 
-	QApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
-	QSurfaceFormat::setDefaultFormat(AVOpenGLWidget::CreateSurfaceFormat());
+    SDL_SetHint(SDL_HINT_APP_NAME, "chiaki4deck");
 
-	QApplication app(argc, argv);
+	if(SDL_Init(SDL_INIT_AUDIO) < 0)
+	{
+		fprintf(stderr, "SDL Audio init failed: %s\n", SDL_GetError());
+		return 1;
+	}
+
+	QGuiApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
+
+	QGuiApplication app(argc, argv);
 
 #ifdef Q_OS_MACOS
-	QApplication::setWindowIcon(QIcon(":/icons/chiaki_macos.svg"));
+	QGuiApplication::setWindowIcon(QIcon(":/icons/chiaki_macos.svg"));
 #else
-	QApplication::setWindowIcon(QIcon(":/icons/chiaki.svg"));
+	QGuiApplication::setWindowIcon(QIcon(":/icons/chiaki4deck.svg"));
 #endif
-
-	QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-
-	Settings settings;
 
 	QCommandLineParser parser;
 	parser.setOptionsAfterPositionalArgumentsMode(QCommandLineParser::ParseAsPositionalArguments);
 	parser.addHelpOption();
-
+	
 	QStringList cmds;
 	cmds.append("stream");
 	cmds.append("list");
@@ -95,7 +113,10 @@ int real_main(int argc, char *argv[])
 	parser.addPositionalArgument("command", cmds.join(", "));
 	parser.addPositionalArgument("nickname", "Needed for stream command to get credentials for connecting. "
 			"Use 'list' to get the nickname.");
-	parser.addPositionalArgument("host", "Address to connect to (when using the stream command)");
+	parser.addPositionalArgument("host", "Address to connect to (when using the stream command).");
+
+	QCommandLineOption profile_option("profile", "", "profile", "Configuration profile");
+	parser.addOption(profile_option);
 
 	QCommandLineOption regist_key_option("registkey", "", "registkey");
 	parser.addOption(regist_key_option);
@@ -103,17 +124,25 @@ int real_main(int argc, char *argv[])
 	QCommandLineOption morning_option("morning", "", "morning");
 	parser.addOption(morning_option);
 
-	QCommandLineOption fullscreen_option("fullscreen", "Start window in fullscreen mode [maintains aspect ratio, adds black bars to fill unsused parts of screen if applicable] (only for use with stream command)");
+	QCommandLineOption fullscreen_option("fullscreen", "Start window in fullscreen mode [maintains aspect ratio, adds black bars to fill unsused parts of screen if applicable] (only for use with stream command).");
 	parser.addOption(fullscreen_option);
+
+	QCommandLineOption dualsense_option("dualsense", "Enable DualSense haptics and adaptive triggers (PS5 and DualSense connected via USB only).");
+	parser.addOption(dualsense_option);
 
 	QCommandLineOption zoom_option("zoom", "Start window in fullscreen zoomed in to fit screen [maintains aspect ratio, cutting off edges of image to fill screen] (only for use with stream command)");
 	parser.addOption(zoom_option);
 
-	QCommandLineOption stretch_option("stretch", "Start window in fullscreen stretched to fit screen [distorts aspect ratio to fill screen] (only for use with stream command)");
+	QCommandLineOption stretch_option("stretch", "Start window in fullscreen stretched to fit screen [distorts aspect ratio to fill screen] (only for use with stream command).");
 	parser.addOption(stretch_option);
+
+	QCommandLineOption passcode_option("passcode", "Automatically send your PlayStation login passcode (only affects users with a login passcode set on their PlayStation console).", "passcode");
+	parser.addOption(passcode_option);
 
 	parser.process(app);
 	QStringList args = parser.positionalArguments();
+
+	Settings settings(parser.isSet(profile_option) ? parser.value(profile_option) : QString());
 
 	if(args.length() == 0)
 		return RunMain(app, &settings);
@@ -133,6 +162,7 @@ int real_main(int argc, char *argv[])
 		QString host = args[args.size()-1];
 		QByteArray morning;
 		QByteArray regist_key;
+		QString initial_login_passcode;
 		ChiakiTarget target = CHIAKI_TARGET_PS4_10;
 
 		if(parser.value(regist_key_option).isEmpty() && parser.value(morning_option).isEmpty())
@@ -185,15 +215,32 @@ int real_main(int argc, char *argv[])
 			printf("Must choose between fullscreen, zoom or stretch option.");
 			return 1;
 		}
-
+		if(parser.value(passcode_option).isEmpty())
+		{
+			//Set to empty if it wasn't given by user.
+			initial_login_passcode = QString("");
+		}
+		else
+		{
+			initial_login_passcode = parser.value(passcode_option);
+			if(initial_login_passcode.length() != 4)
+			{
+				printf("Login passcode must be 4 digits. You entered %d digits)\n", initial_login_passcode.length());
+				return 1;
+			}
+		}
+		
 		StreamSessionConnectInfo connect_info(
 				&settings,
 				target,
 				host,
 				regist_key,
 				morning,
+				initial_login_passcode,
+				QString(),
 				parser.isSet(fullscreen_option),
-				parser.isSet(zoom_option) ? TransformMode::Zoom : parser.isSet(stretch_option) ? TransformMode::Stretch : TransformMode::Fit);
+				parser.isSet(zoom_option),
+				parser.isSet(stretch_option));
 
 		return RunStream(app, connect_info);
 	}
@@ -222,16 +269,16 @@ int real_main(int argc, char *argv[])
 	}
 }
 
-int RunMain(QApplication &app, Settings *settings)
+int RunMain(QGuiApplication &app, Settings *settings)
 {
-	MainWindow main_window(settings);
+	QmlMainWindow main_window(settings);
 	main_window.show();
 	return app.exec();
 }
 
-int RunStream(QApplication &app, const StreamSessionConnectInfo &connect_info)
+int RunStream(QGuiApplication &app, const StreamSessionConnectInfo &connect_info)
 {
-	StreamWindow *window = new StreamWindow(connect_info);
-	app.setQuitOnLastWindowClosed(true);
+	QmlMainWindow main_window(connect_info);
+	main_window.show();
 	return app.exec();
 }

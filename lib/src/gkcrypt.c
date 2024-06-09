@@ -504,11 +504,12 @@ static void *gkcrypt_thread_func(void *user)
 	assert(err == CHIAKI_ERR_SUCCESS);
 	while(1)
 	{
-		err = chiaki_cond_wait_pred(&gkcrypt->key_buf_cond, key_buf_mutex_pred, gkcrypt);
+		err = chiaki_cond_wait_pred(&gkcrypt->key_buf_cond, &gkcrypt->key_buf_mutex, key_buf_mutex_pred, gkcrypt);
 
 		if(gkcrypt->key_buf_thread_stop || err != CHIAKI_ERR_SUCCESS)
 			break;
 
+		/*
 		CHIAKI_LOGV(gkcrypt->log, "GKCrypt %d key buf size %#llx, start offset: %#llx, populated: %#llx, min key pos: %#llx, last key pos: %#llx, generating next chunk",
 					(int)gkcrypt->index,
 					(unsigned long long)gkcrypt->key_buf_size,
@@ -516,6 +517,7 @@ static void *gkcrypt_thread_func(void *user)
 					(unsigned long long)gkcrypt->key_buf_populated,
 					(unsigned long long)gkcrypt->key_buf_key_pos_min,
 					(unsigned long long)gkcrypt->last_key_pos);
+		*/
 
 		if(gkcrypt->last_key_pos > gkcrypt->key_buf_key_pos_min + gkcrypt->key_buf_populated)
 		{

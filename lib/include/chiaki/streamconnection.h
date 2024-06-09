@@ -35,6 +35,7 @@ typedef struct chiaki_stream_connection_t
 	ChiakiAudioReceiver *haptics_receiver;
 
 	ChiakiFeedbackSender feedback_sender;
+	ChiakiCongestionControl congestion_control;
 	/**
 	 * whether feedback_sender is initialized
 	 * only if this is true, feedback_sender may be accessed!
@@ -61,6 +62,8 @@ typedef struct chiaki_stream_connection_t
 	bool should_stop;
 	bool remote_disconnected;
 	char *remote_disconnect_reason;
+
+	double measured_bitrate;
 } ChiakiStreamConnection;
 
 CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_init(ChiakiStreamConnection *stream_connection, ChiakiSession *session);
@@ -69,8 +72,9 @@ CHIAKI_EXPORT void chiaki_stream_connection_fini(ChiakiStreamConnection *stream_
 /**
  * Run stream_connection synchronously
  */
-CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnection *stream_connection);
+CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnection *stream_connection, chiaki_socket_t *socket);
 
+CHIAKI_EXPORT ChiakiErrorCode stream_connection_send_toggle_mute_direct_message(ChiakiStreamConnection *stream_connection, bool muted);
 /**
  * To be called from a thread other than the one chiaki_stream_connection_run() is running on to stop stream_connection
  */

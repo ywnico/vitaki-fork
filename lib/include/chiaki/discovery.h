@@ -83,7 +83,11 @@ typedef struct chiaki_discovery_t
 {
 	ChiakiLog *log;
 	chiaki_socket_t socket;
+#if defined(__SWITCH__) || defined(__PSVITA__)
 	struct sockaddr local_addr;
+#else
+	struct sockaddr_in6 local_addr;
+#endif
 } ChiakiDiscovery;
 
 CHIAKI_EXPORT ChiakiErrorCode chiaki_discovery_init(ChiakiDiscovery *discovery, ChiakiLog *log, sa_family_t family);
@@ -102,6 +106,7 @@ typedef struct chiaki_discovery_thread_t
 } ChiakiDiscoveryThread;
 
 CHIAKI_EXPORT ChiakiErrorCode chiaki_discovery_thread_start(ChiakiDiscoveryThread *thread, ChiakiDiscovery *discovery, ChiakiDiscoveryCb cb, void *cb_user);
+CHIAKI_EXPORT ChiakiErrorCode chiaki_discovery_thread_start_oneshot(ChiakiDiscoveryThread *thread, ChiakiDiscovery *discovery, ChiakiDiscoveryCb cb, void *cb_user);
 CHIAKI_EXPORT ChiakiErrorCode chiaki_discovery_thread_stop(ChiakiDiscoveryThread *thread);
 
 /**

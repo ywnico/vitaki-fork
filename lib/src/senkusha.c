@@ -44,8 +44,10 @@
 typedef enum {
 	STATE_IDLE,
 	STATE_TAKION_CONNECT,
+	STATE_EXPECT_STREAMINFO_ACK,
 	STATE_EXPECT_BANG,
 	STATE_EXPECT_DATA_ACK,
+	STATE_EXPECT_PROTOCOL_ACK,
 	STATE_EXPECT_PONG,
 	STATE_EXPECT_MTU,
 	STATE_EXPECT_CLIENT_MTU_COMMAND
@@ -58,6 +60,7 @@ static void senkusha_takion_cb(ChiakiTakionEvent *event, void *user);
 static void senkusha_takion_data(ChiakiSenkusha *senkusha, ChiakiTakionMessageDataType data_type, uint8_t *buf, size_t buf_size);
 static void senkusha_takion_data_ack(ChiakiSenkusha *senkusha, ChiakiSeqNum32 seq_num);
 static void senkusha_takion_av(ChiakiSenkusha *senkusha, ChiakiTakionAVPacket *packet);
+static ChiakiErrorCode senkusha_set_version(ChiakiSenkusha *senkusha);
 static ChiakiErrorCode senkusha_send_big(ChiakiSenkusha *senkusha);
 static ChiakiErrorCode senkusha_send_disconnect(ChiakiSenkusha *senkusha);
 static ChiakiErrorCode senkusha_send_echo_command(ChiakiSenkusha *senkusha, bool enable);
@@ -108,7 +111,7 @@ static bool state_finished_cond_check(void *user)
 	return senkusha->state_finished || senkusha->should_stop;
 }
 
-CHIAKI_EXPORT ChiakiErrorCode chiaki_senkusha_run(ChiakiSenkusha *senkusha, uint32_t *mtu_in, uint32_t *mtu_out, uint64_t *rtt_us)
+CHIAKI_EXPORT ChiakiErrorCode chiaki_senkusha_run(ChiakiSenkusha *senkusha, uint32_t *mtu_in, uint32_t *mtu_out, uint64_t *rtt_us, chiaki_socket_t *socket)
 {
 	ChiakiSession *session = senkusha->session;
 	ChiakiErrorCode err;
@@ -129,17 +132,23 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_senkusha_run(ChiakiSenkusha *senkusha, uint
 
 	ChiakiTakionConnectInfo takion_info;
 	takion_info.log = senkusha->log;
-	takion_info.sa_len = session->connect_info.host_addrinfo_selected->ai_addrlen;
-	takion_info.sa = malloc(takion_info.sa_len);
-	if(!takion_info.sa)
+	if(!socket)
 	{
-		err = CHIAKI_ERR_MEMORY;
-		QUIT(quit);
-	}
+		takion_info.close_socket = true;
+		takion_info.sa_len = session->connect_info.host_addrinfo_selected->ai_addrlen;
+		takion_info.sa = malloc(takion_info.sa_len);
+		if(!takion_info.sa)
+		{
+			err = CHIAKI_ERR_MEMORY;
+			QUIT(quit);
+		}
 
-	memcpy(takion_info.sa, session->connect_info.host_addrinfo_selected->ai_addr, takion_info.sa_len);
-	err = set_port(takion_info.sa, htons(SENKUSHA_PORT));
-	assert(err == CHIAKI_ERR_SUCCESS);
+		memcpy(takion_info.sa, session->connect_info.host_addrinfo_selected->ai_addr, takion_info.sa_len);
+		err = set_port(takion_info.sa, htons(SENKUSHA_PORT));
+		assert(err == CHIAKI_ERR_SUCCESS);
+	}
+	else
+		takion_info.close_socket = false;
 	takion_info.ip_dontfrag = true;
 
 	takion_info.enable_crypt = false;
@@ -152,15 +161,17 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_senkusha_run(ChiakiSenkusha *senkusha, uint
 	senkusha->state_finished = false;
 	senkusha->state_failed = false;
 
-	err = chiaki_takion_connect(&senkusha->takion, &takion_info);
-	free(takion_info.sa);
+	err = chiaki_takion_connect(&senkusha->takion, &takion_info, socket);
+	if(!socket)
+		free(takion_info.sa);
+	
 	if(err != CHIAKI_ERR_SUCCESS)
 	{
 		CHIAKI_LOGE(session->log, "Senkusha connect failed");
 		QUIT(quit);
 	}
 
-	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
+	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 	if(!senkusha->state_finished)
 	{
@@ -175,6 +186,36 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_senkusha_run(ChiakiSenkusha *senkusha, uint
 		QUIT(quit_takion);
 	}
 
+	CHIAKI_LOGI(session->log, "Setting takion versions");
+
+	senkusha->state = STATE_EXPECT_PROTOCOL_ACK;
+	senkusha->state_finished = false;
+	senkusha->state_failed = false;
+
+	err = senkusha_set_version(senkusha);
+	if(err != CHIAKI_ERR_SUCCESS)
+	{
+		CHIAKI_LOGE(session->log, "Senkusha failed to set takion version");
+		QUIT(quit_takion);
+	}
+	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
+	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
+
+	if(!senkusha->state_finished)
+	{
+		if(err == CHIAKI_ERR_TIMEOUT)
+			CHIAKI_LOGE(session->log, "Senkusha set takion version receive timeout");
+
+		if(senkusha->should_stop)
+			err = CHIAKI_ERR_CANCELED;
+		else
+			CHIAKI_LOGE(session->log, "Senkusha didn't receive protocol request ack");
+
+		QUIT(quit_takion);
+	}
+
+	CHIAKI_LOGI(session->log, "Senkusha successfully set takion version");
+
 	CHIAKI_LOGI(session->log, "Senkusha sending big");
 
 	senkusha->state = STATE_EXPECT_BANG;
@@ -187,7 +228,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_senkusha_run(ChiakiSenkusha *senkusha, uint
 		QUIT(quit_takion);
 	}
 
-	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
+	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 
 	if(!senkusha->state_finished)
@@ -301,7 +342,7 @@ static ChiakiErrorCode senkusha_run_rtt_test(ChiakiSenkusha *senkusha, uint16_t 
 			return err;
 		}
 
-		err = chiaki_cond_timedwait_pred(&senkusha->state_cond, EXPECT_PONG_TIMEOUT_MS, state_finished_cond_check, senkusha);
+		err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, EXPECT_PONG_TIMEOUT_MS, state_finished_cond_check, senkusha);
 		assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 
 		if(!senkusha->state_finished)
@@ -375,7 +416,7 @@ static ChiakiErrorCode senkusha_run_mtu_in_test(ChiakiSenkusha *senkusha, uint32
 			CHIAKI_LOGI(senkusha->log, "Senkusha MTU request %u (min %u, max %u), id %u, attempt %u",
 					(unsigned int)cur, (unsigned int)min, (unsigned int)max, (unsigned int)request_id, (unsigned int)attempt);
 
-			err = chiaki_cond_timedwait_pred(&senkusha->state_cond, timeout_ms, state_finished_cond_check, senkusha);
+			err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, timeout_ms, state_finished_cond_check, senkusha);
 			assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 
 			if(!senkusha->state_finished)
@@ -438,7 +479,7 @@ static ChiakiErrorCode senkusha_run_mtu_out_test(ChiakiSenkusha *senkusha, uint3
 
 	CHIAKI_LOGI(senkusha->log, "Senkusha sent initial client MTU command");
 
-	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
+	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 
 	if(!senkusha->state_finished)
@@ -512,7 +553,7 @@ static ChiakiErrorCode senkusha_run_mtu_out_test(ChiakiSenkusha *senkusha, uint3
 			}
 			else
 			{
-				err = chiaki_cond_timedwait_pred(&senkusha->state_cond, timeout_ms, state_finished_cond_check, senkusha);
+				err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, timeout_ms, state_finished_cond_check, senkusha);
 			}
 
 			assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
@@ -623,6 +664,18 @@ static void senkusha_takion_data(ChiakiSenkusha *senkusha, ChiakiTakionMessageDa
 			chiaki_cond_signal(&senkusha->state_cond);
 		}
 	}
+	else if(senkusha->state == STATE_EXPECT_PROTOCOL_ACK)
+	{
+		if(msg.type != tkproto_TakionMessage_PayloadType_TAKIONPROTOCOLREQUESTACK || !msg.has_takion_protocol_request_ack)
+		{
+			CHIAKI_LOGE(senkusha->log, "Senkusha expected protocol request ack but received something else");
+		}
+		else
+		{
+			senkusha->state_finished = true;
+			chiaki_cond_signal(&senkusha->state_cond);
+		}
+	}
 	else if(senkusha->state == STATE_EXPECT_CLIENT_MTU_COMMAND)
 	{
 		if(msg.type != tkproto_TakionMessage_PayloadType_SENKUSHA
@@ -718,6 +771,33 @@ beach:
 	chiaki_mutex_unlock(&senkusha->state_mutex);
 }
 
+static ChiakiErrorCode senkusha_set_version(ChiakiSenkusha *senkusha)
+{
+	tkproto_TakionMessage msg;
+	memset(&msg, 0, sizeof(msg));
+	List versions;
+	versions.items[0] = 9;
+	versions.num_items = 1;
+	msg.type = tkproto_TakionMessage_PayloadType_TAKIONPROTOCOLREQUEST;
+	msg.has_takion_protocol_request = true;
+	msg.takion_protocol_request.supported_takion_versions.arg = &versions;
+	msg.takion_protocol_request.supported_takion_versions.funcs.encode = chiaki_pb_encode_list;
+
+	uint8_t buf[12];
+	size_t buf_size;
+
+	pb_ostream_t stream = pb_ostream_from_buffer(buf, sizeof(buf));
+	bool pbr = pb_encode(&stream, tkproto_TakionMessage_fields, &msg);
+	if(!pbr)
+	{
+		CHIAKI_LOGE(senkusha->log, "Senkusha set version protobuf encoding failed");
+		return CHIAKI_ERR_UNKNOWN;
+	}
+	buf_size = stream.bytes_written;
+	ChiakiErrorCode err = chiaki_takion_send_message_data(&senkusha->takion, 1, 1, buf, buf_size, NULL);
+	return err;
+}
+
 static ChiakiErrorCode senkusha_send_big(ChiakiSenkusha *senkusha)
 {
 	tkproto_TakionMessage msg;
@@ -725,7 +805,7 @@ static ChiakiErrorCode senkusha_send_big(ChiakiSenkusha *senkusha)
 
 	msg.type = tkproto_TakionMessage_PayloadType_BIG;
 	msg.has_big_payload = true;
-	msg.big_payload.client_version = 7;
+	msg.big_payload.client_version = 9;
 	msg.big_payload.session_key.arg = "";
 	msg.big_payload.session_key.funcs.encode = chiaki_pb_encode_string;
 	msg.big_payload.launch_spec.arg = "";
@@ -861,7 +941,7 @@ static ChiakiErrorCode senkusha_send_data_wait_for_ack(ChiakiSenkusha *senkusha,
 		return err;
 	}
 
-	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
+	err = chiaki_cond_timedwait_pred(&senkusha->state_cond, &senkusha->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, senkusha);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 
 	if(!senkusha->state_finished)

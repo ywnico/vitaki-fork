@@ -237,7 +237,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_select_single(ChiakiStopPipe *sto
 	do
 	{
 		r = select(nfds, &rfds, write ? &wfds : NULL, NULL, timeout);
+#ifdef _WIN32
+	} while(r < 0 && WSAGetLastError() == WSAEINTR)
+#else
 	} while(r < 0 && errno == EINTR);
+#endif
 
 	if(r < 0)
 		return CHIAKI_ERR_UNKNOWN;
@@ -305,19 +309,21 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stop_pipe_connect(ChiakiStopPipe *stop_pipe
 	}
 
 #ifdef _WIN32
-	DWORD sockerr;
-#else
 	int sockerr;
-#endif
-// #ifdef __PSVITA__
+	socklen_t sockerr_sz = sizeof(sockerr);
+	if(getsockopt(fd, SOL_SOCKET, SO_ERROR, (char*)(&sockerr), &sockerr_sz) < 0)
+		return CHIAKI_ERR_UNKNOWN;
+// #elif defined(__PSVITA__)
+//	int sockerr;
 // 	socklen_t sockerr_sz = sizeof(sockerr);
 // 	if(sceNetGetsockopt(fd, SCE_NET_SOL_SOCKET, SCE_NET_SO_ERROR, &sockerr, &sockerr_sz) < 0)
 // 		return CHIAKI_ERR_UNKNOWN;
-// #else
+#else
+	int sockerr;
 	socklen_t sockerr_sz = sizeof(sockerr);
 	if(getsockopt(fd, SOL_SOCKET, SO_ERROR, &sockerr, &sockerr_sz) < 0)
 		return CHIAKI_ERR_UNKNOWN;
-// #endif
+#endif
 
 #ifdef _WIN32
 	switch(sockerr)

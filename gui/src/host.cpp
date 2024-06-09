@@ -18,7 +18,8 @@ RegisteredHost::RegisteredHost(const RegisteredHost &o)
 	ap_name(o.ap_name),
 	server_mac(o.server_mac),
 	server_nickname(o.server_nickname),
-	rp_key_type(o.rp_key_type)
+	rp_key_type(o.rp_key_type),
+	console_pin(o.console_pin)
 {
 	memcpy(rp_regist_key, o.rp_regist_key, sizeof(rp_regist_key));
 	memcpy(rp_key, o.rp_key, sizeof(rp_key));
@@ -36,6 +37,12 @@ RegisteredHost::RegisteredHost(const ChiakiRegisteredHost &chiaki_host)
 	memcpy(rp_regist_key, chiaki_host.rp_regist_key, sizeof(rp_regist_key));
 	rp_key_type = chiaki_host.rp_key_type;
 	memcpy(rp_key, chiaki_host.rp_key, sizeof(rp_key));
+	console_pin = QString::number(chiaki_host.console_pin);
+}
+
+void RegisteredHost::SetConsolePin(RegisteredHost &host, QString console_pin)
+{
+	host.console_pin = console_pin.toUtf8().constData();
 }
 
 void RegisteredHost::SaveToSettings(QSettings *settings) const
@@ -50,6 +57,7 @@ void RegisteredHost::SaveToSettings(QSettings *settings) const
 	settings->setValue("rp_regist_key", QByteArray(rp_regist_key, sizeof(rp_regist_key)));
 	settings->setValue("rp_key_type", rp_key_type);
 	settings->setValue("rp_key", QByteArray((const char *)rp_key, sizeof(rp_key)));
+	settings->setValue("console_pin", console_pin);
 }
 
 RegisteredHost RegisteredHost::LoadFromSettings(QSettings *settings)
@@ -71,6 +79,7 @@ RegisteredHost RegisteredHost::LoadFromSettings(QSettings *settings)
 	auto rp_key = settings->value("rp_key").toByteArray();
 	if(rp_key.size() == sizeof(r.rp_key))
 		memcpy(r.rp_key, rp_key.constData(), sizeof(r.rp_key));
+	r.console_pin = settings->value("console_pin").toString();
 	return r;
 }
 
@@ -96,6 +105,12 @@ ManualHost::ManualHost(int id, const ManualHost &o)
 {
 }
 
+void ManualHost::SetHost(const QString &hostadd)
+{
+	host = hostadd;
+}
+
+
 void ManualHost::SaveToSettings(QSettings *settings) const
 {
 	settings->setValue("id", id);
@@ -114,4 +129,32 @@ ManualHost ManualHost::LoadFromSettings(QSettings *settings)
 	if(registered_mac.size() == 6)
 		r.registered_mac = HostMAC((const uint8_t *)registered_mac.constData());
 	return r;
+}
+
+PsnHost::PsnHost()
+{
+	duid = QString();
+	name = QString();
+	ps5 = false;
+}
+
+PsnHost::PsnHost(const QString &duid, const QString &name, bool ps5)
+	: duid(duid),
+	name(name),
+	ps5(ps5)
+{
+}
+
+ChiakiTarget PsnHost::GetTarget() const
+{
+	if(ps5)
+	{
+		ChiakiTarget target = CHIAKI_TARGET_PS5_1;
+		return target;
+	}
+	else
+	{
+		ChiakiTarget target = CHIAKI_TARGET_PS4_10;
+		return target;
+	}
 }

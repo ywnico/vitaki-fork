@@ -15,8 +15,8 @@
 #include <chiaki/orientation.h>
 #endif
 
-#define PS_TOUCHPAD_MAX_X 1920
-#define PS_TOUCHPAD_MAX_Y 1079
+#define PS_TOUCHPAD_MAXX 1920
+#define PS_TOUCHPAD_MAXY 1079
 
 class Controller;
 
@@ -46,7 +46,7 @@ class ControllerManager : public QObject
 
 		ControllerManager(QObject *parent = nullptr);
 		~ControllerManager();
-
+		void SetButtonsByPos();
 		QSet<int> GetAvailableControllers();
 		Controller *OpenController(int device_id);
 
@@ -73,11 +73,14 @@ class Controller : public QObject
 #endif
 #endif
 
+		int ref;
 		ControllerManager *manager;
 		int id;
 		ChiakiOrientationTracker orientation_tracker;
 		ChiakiControllerState state;
 		bool is_dualsense;
+		bool is_steamdeck;
+		bool micbutton_push;
 
 #ifdef CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
 		QMap<QPair<Sint64, Sint64>, uint8_t> touch_ids;
@@ -87,16 +90,23 @@ class Controller : public QObject
 	public:
 		~Controller();
 
+		void Ref();
+		void Unref();
+
 		bool IsConnected();
 		int GetDeviceID();
 		QString GetName();
 		ChiakiControllerState GetState();
 		void SetRumble(uint8_t left, uint8_t right);
 		void SetTriggerEffects(uint8_t type_left, const uint8_t *data_left, uint8_t type_right, const uint8_t *data_right);
+		void SetDualsenseMic(bool on);
+		void SetHapticRumble(uint16_t left, uint16_t right, int ms);
 		bool IsDualSense();
+		bool IsSteamDeck();
 
 	signals:
 		void StateChanged();
+		void MicButtonPush();
 };
 
 /* PS5 trigger effect documentation:

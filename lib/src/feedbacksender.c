@@ -252,7 +252,7 @@ static void *feedback_sender_thread_func(void *user)
 	uint64_t next_timeout = FEEDBACK_STATE_TIMEOUT_MAX_MS;
 	while(true)
 	{
-		err = chiaki_cond_timedwait_pred(&feedback_sender->state_cond, next_timeout, state_cond_check, feedback_sender);
+		err = chiaki_cond_timedwait_pred(&feedback_sender->state_cond, &feedback_sender->state_mutex, next_timeout, state_cond_check, feedback_sender);
 		if(err != CHIAKI_ERR_SUCCESS && err != CHIAKI_ERR_TIMEOUT)
 			break;
 

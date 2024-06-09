@@ -30,10 +30,13 @@ ninja
 ninja install
 cd ../..
 
-wget https://download.firedaemon.com/FireDaemon-OpenSSL/openssl-1.1.1s.zip && 7z x openssl-1.1.*.zip
+wget https://mirror.firedaemon.com/OpenSSL/openssl-1.1.1q.zip && 7z x openssl-1.1.1q.zip
 
-wget https://www.libsdl.org/release/SDL2-devel-2.26.2-VC.zip && 7z x SDL2-devel-2.26.2-VC.zip
-export SDL_ROOT="$BUILD_ROOT/SDL2-2.26.2"
+# We need to avoid SDL Versions > 2.0.20 on Windows, since there's a problem with resampling using
+# the WASAPI audio driver: https://github.com/libsdl-org/SDL/issues/6326
+# TODO: Update to the latest version once 2.26.0 is released with a fix
+wget https://www.libsdl.org/release/SDL2-devel-2.0.20-VC.zip && 7z x SDL2-devel-2.0.20-VC.zip
+export SDL_ROOT="$BUILD_ROOT/SDL2-2.0.20"
 export SDL_ROOT=${SDL_ROOT//[\\]//}
 echo "set(SDL2_INCLUDE_DIRS \"$SDL_ROOT/include\")
 set(SDL2_LIBRARIES \"$SDL_ROOT/lib/x64/SDL2.lib\")
@@ -53,6 +56,9 @@ QT_PATH="C:/Qt/5.15/msvc2019_64"
 COPY_DLLS="$PWD/openssl-1.1/x64/bin/libcrypto-1_1-x64.dll $PWD/openssl-1.1/x64/bin/libssl-1_1-x64.dll $SDL_ROOT/lib/x64/SDL2.dll"
 
 echo "-- Configure"
+
+# SDL version discovery doesn't work with 2.0.20, so we just remove the version check ¯\_(ツ)_/¯
+sed -i -e 's/find_package(SDL2 2.0.16 MODULE REQUIRED)/find_package(SDL2 MODULE REQUIRED)/g' gui/CMakeLists.txt
 
 mkdir build && cd build
 

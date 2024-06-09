@@ -5,6 +5,10 @@ build
 cmake-build-*
 /build_*
 /build-*
+/debug
+/Debug
+/release
+/Release
 .DS_store
 *.AppImage
 appdir
@@ -31,3 +35,5 @@ chiaki.conf
 .cache/
 /*.app
 /*.dmg
+*.vscode
+site/

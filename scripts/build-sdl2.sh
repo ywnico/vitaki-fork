@@ -6,7 +6,7 @@ cd $(dirname "${BASH_SOURCE[0]}")/..
 cd "./$1"
 ROOT="`pwd`"
 
-SDL_VER=2.26.1
+SDL_VER=2.28.5
 URL=https://www.libsdl.org/release/SDL2-${SDL_VER}.tar.gz
 FILE=SDL2-${SDL_VER}.tar.gz
 DIR=SDL2-${SDL_VER}
@@ -20,10 +20,10 @@ cd "$DIR" || exit 1
 
 mkdir -p build && cd build || exit 1
 cmake \
-	-DCMAKE_INSTALL_PREFIX="$ROOT/sdl2-prefix" \
-	-DSDL_ATOMIC=OFF \
+	-DCMAKE_INSTALL_PREFIX="/usr" \
+	-DSDL_ATOMIC=ON \
 	-DSDL_AUDIO=ON \
-	-DSDL_CPUINFO=OFF \
+	-DSDL_CPUINFO=ON \
 	-DSDL_EVENTS=ON \
 	-DSDL_FILE=OFF \
 	-DSDL_FILESYSTEM=OFF \
@@ -35,11 +35,19 @@ cmake \
 	-DSDL_STATIC=OFF \
 	-DSDL_TEST=OFF \
 	-DSDL_THREADS=ON \
-	-DSDL_TIMERS=OFF \
+	-DSDL_TIMERS=ON \
 	-DSDL_VIDEO=OFF \
+	-DSDL_OSS=OFF \
+	-DSDL_ALSA=OFF \
+	-DSDL_JACK=OFF \
+	-DSDL_ESD=OFF \
+	-DSDL_NAS=OFF \
+	-DSDL_SNDIO=OFF \
+	-DSDL_ARTS=OFF \
+	-DSDL_PULSEAUDIO=OFF \
+	-DSDL_PIPEWIRE=ON \
 	..
 # SDL_THREADS is not needed, but it doesn't compile without
 
 make -j4
 make install
-
