@@ -1,9 +1,18 @@
 # Vitaki fork notes
 
 This is ywnico's fork of [aa's Vitaki](https://git.catvibers.me/aa/chiaki) with the following updates:
-1. Fixed audio
-2. Includes [ghost's LiveArea icon fixes](https://git.catvibers.me/aa/chiaki/pulls/13)
-3. Merged in updates from chiaki4deck (may have improved some connection issues)
+1. Implemented audio
+2. Added the following control mappings:
+    | Map sent to PS4/5 | Vita controls |
+    | -----|----- |
+    | `L2` | `L1` + left side of rear touch sensor |
+    | `R2` | `R1` + right side of rear touch sensor |
+    | Touchpad (trapezoid button) | front touch screen |
+    | Left analog stick button | `D-pad left` + `Square` |
+    | Right analog stick button | `D-pad right` + `Circle` |
+3. Included [ghost's LiveArea icon fixes](https://git.catvibers.me/aa/chiaki/pulls/13)
+4. Disabled `vblank_wait` (reduces lag)
+5. Merged in updates from chiaki4deck (improved some connection issues)
 
 # Chiaki
 

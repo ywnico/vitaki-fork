@@ -7,6 +7,7 @@
 #include "string.h"
 #include <stdio.h>
 #include <psp2/ctrl.h>
+#include <psp2/touch.h>
 #include <chiaki/base64.h>
 #include <chiaki/session.h>
 
@@ -124,9 +125,48 @@ static void *input_thread_func(void* user) {
   sceCtrlSetSamplingModeExt(SCE_CTRL_MODE_ANALOG_WIDE);
   SceCtrlData ctrl;
 	VitaChiakiStream *stream = user;
+  int ms_per_loop = 5;
+
+  // Touchscreen setup
+	sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
+	sceTouchSetSamplingState(SCE_TOUCH_PORT_BACK, SCE_TOUCH_SAMPLING_STATE_START);
+	sceTouchEnableTouchForce(SCE_TOUCH_PORT_FRONT);
+	sceTouchEnableTouchForce(SCE_TOUCH_PORT_BACK);
+	SceTouchData touch[SCE_TOUCH_PORT_MAX_NUM];
+  int TOUCH_MAX_WIDTH = 1919;
+
   while (true) {
+
+    bool l2 = false;
+    bool r2 = false;
+    bool rear_touch_left = false;
+    bool rear_touch_right= false;
+    bool front_touch = false;
+
     if (stream->is_streaming) {
+      // get button state
       sceCtrlPeekBufferPositiveExt2(0, &ctrl, 1);
+
+      // get touchscreen state
+      for(int port = 0; port < SCE_TOUCH_PORT_MAX_NUM; port++) {
+        sceTouchPeek(port, &touch[port], 1);
+      }
+
+      front_touch = (touch[SCE_TOUCH_PORT_FRONT].reportNum >= 1);
+
+      for (int touch_i = 0; touch_i < touch[SCE_TOUCH_PORT_BACK].reportNum; touch_i++) {
+        if (touch[SCE_TOUCH_PORT_BACK].report[touch_i].x > TOUCH_MAX_WIDTH/2) {
+          rear_touch_right = true;
+        } else if (touch[SCE_TOUCH_PORT_BACK].report[touch_i].x < TOUCH_MAX_WIDTH/2) {
+          rear_touch_left = true;
+        }
+
+        // No need to keep checking touches
+        if (rear_touch_right && rear_touch_left) {
+          break;
+        }
+      }
+
       // 0-255 conversion
       stream->controller_state.left_x = (ctrl.lx - 128) * 2 * 0x7F/*.FF*/;
       stream->controller_state.left_y = (ctrl.ly - 128) * 2 * 0x7F/*.FF*/;
@@ -148,15 +188,49 @@ static void *input_thread_func(void* user) {
       if (ctrl.buttons & SCE_CTRL_CIRCLE) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_MOON;
       if (ctrl.buttons & SCE_CTRL_CROSS) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_CROSS;
       if (ctrl.buttons & SCE_CTRL_SQUARE) stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_BOX;
+
+      // Select + Start = PS
       if ((ctrl.buttons & SCE_CTRL_SELECT) && (ctrl.buttons & SCE_CTRL_START)) {
         stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_SHARE;
         stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_OPTIONS;
         stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_PS;
       }
 
+      // Rear touch screen left + L1 = L2
+      if ((rear_touch_left) && (ctrl.buttons & SCE_CTRL_L1)) {
+        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_L1;
+        l2 = true;
+      }
+      // Rear touch screen right + R1 = R2
+      if ((rear_touch_right) && (ctrl.buttons & SCE_CTRL_R1)) {
+        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_R1;
+        r2 = true;
+      }
+
+      // Dpad-left + Square = left analog push
+      if ((ctrl.buttons & SCE_CTRL_LEFT) && (ctrl.buttons & SCE_CTRL_SQUARE)) {
+        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_DPAD_LEFT;
+        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_BOX;
+        stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_L3;
+      }
+      // Dpad-right + Circle = right analog push
+      if ((ctrl.buttons & SCE_CTRL_RIGHT) && (ctrl.buttons & SCE_CTRL_CIRCLE)) {
+        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_DPAD_RIGHT;
+        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_MOON;
+        stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_R3;
+      }
+
+      // Front touch screen (anywhere) = touchpad
+      if (front_touch) {
+        stream->controller_state.buttons |= CHIAKI_CONTROLLER_BUTTON_TOUCHPAD;
+      }
+
+      stream->controller_state.l2_state = l2 ? 0xff : 0x00;
+      stream->controller_state.r2_state = r2 ? 0xff : 0x00;
+
       chiaki_session_set_controller_state(&stream->session, &stream->controller_state);
       // LOGD("ly 0x%x %d", ctrl.ly, ctrl.ly);
-      usleep(5000); // 5 ms
+      usleep(ms_per_loop*1000);
     }
   }
 
