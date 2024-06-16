@@ -869,11 +869,11 @@ void draw_indicators() {
 void vita_h264_start() {
   active_video_thread = true;
 	chiaki_mutex_init(&mtx, false);
-//   vita2d_set_vblank_wait(config.enable_vita_vblank_wait);
+  vita2d_set_vblank_wait(false);
 }
 
 void vita_h264_stop() {
-  // vita2d_set_vblank_wait(true);
+  vita2d_set_vblank_wait(true);
   active_video_thread = false;
 	chiaki_mutex_fini(&mtx);
 }

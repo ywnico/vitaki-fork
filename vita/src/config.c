@@ -60,7 +60,7 @@ void config_parse(VitaChiakiConfig* cfg) {
   cfg->auto_discovery = true;
   cfg->disconnect_action = DISCONNECT_ACTION_ASK;
   cfg->resolution = CHIAKI_VIDEO_RESOLUTION_PRESET_540p;
-  cfg->fps = CHIAKI_VIDEO_FPS_PRESET_60;
+  cfg->fps = CHIAKI_VIDEO_FPS_PRESET_30;
   if (access(CFG_FILENAME, F_OK) == 0) {
     FILE* fp = fopen(CFG_FILENAME, "r");
     char errbuf[200];
@@ -104,7 +104,7 @@ void config_parse(VitaChiakiConfig* cfg) {
       if (datum.ok) {
         cfg->fps = datum.u.i == 30 ? CHIAKI_VIDEO_FPS_PRESET_30 : CHIAKI_VIDEO_FPS_PRESET_60;
       } else {
-        cfg->fps = CHIAKI_VIDEO_FPS_PRESET_60;
+        cfg->fps = CHIAKI_VIDEO_FPS_PRESET_30;
       }
       datum = toml_string_in(settings, "psn_account_id");
       if (datum.ok) {
