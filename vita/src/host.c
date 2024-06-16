@@ -103,6 +103,7 @@ static void event_cb(ChiakiEvent *event, void *user) {
 			LOGE("EventCB CHIAKI_EVENT_QUIT");
 	    chiaki_opus_decoder_fini(&context.stream.opus_decoder);
       vita_h264_cleanup();
+      vita_audio_cleanup();
       context.stream.is_streaming = false;
 			break;
 	}

@@ -91,7 +91,6 @@ void vita_audio_init(unsigned int channels_, unsigned int rate_, void *user) {
 
 
 // Determine required buffer size and allocate the required memory
-// TODO figure out where/when to free this buffer....
 void init_buffer() {
     // set global buffer_frames
     int two_pow = frame_size & ((~frame_size)+1); // highest power of 2 dividing frame_size
@@ -116,6 +115,13 @@ void init_buffer() {
     write_read_framediff = 0;
 
     LOGD("VITA AUDIO :: buffer init: buffer_frames %d, buffer_samples %d, buffer_bytes %d, frame_size %d, sample_bytes %d", buffer_frames, buffer_samples, buffer_bytes, frame_size, sample_bytes);
+}
+
+void vita_audio_cleanup() {
+    if (did_secondary_init) {
+        free(buffer);
+        did_secondary_init = false;
+    }
 }
 
 void vita_audio_cb(int16_t *buf_in, size_t samples_count, void *user) {
