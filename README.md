@@ -13,7 +13,7 @@ This is ywnico's fork of [aa's Vitaki](https://git.catvibers.me/aa/chiaki) with 
 3. Included [ghost's LiveArea icon fixes](https://git.catvibers.me/aa/chiaki/pulls/13)
 4. Disabled `vblank_wait` (reduces lag)
 5. Default fps to 30 (reduces lag).
-    - NOTE: if you copied `chiaki.toml` from your computer, it may include the line `fps = 60`, which Vitaki will read (worsening lag). In this case, edit the file from VitaShell or similar to ensure it says `fps = 30`.
+    - NOTE: if you copied the config file (`chiaki.toml`) from your computer or if you previously used Vitaki, the config file may include the line `fps = 60`, which Vitaki will read (worsening lag). In this case, edit the file from VitaShell or similar to ensure it says `fps = 30`.
 6. Merged in updates from chiaki4deck (improved some connection issues)
 
 # Chiaki
