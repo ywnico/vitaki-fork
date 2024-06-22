@@ -101,11 +101,13 @@ void config_parse(VitaChiakiConfig* cfg) {
         cfg->resolution = CHIAKI_VIDEO_RESOLUTION_PRESET_540p;
       }
       datum = toml_int_in(settings, "fps");
+
+      // set fps to 30 regardless of config file
+      cfg->fps = CHIAKI_VIDEO_FPS_PRESET_30;
       if (datum.ok) {
-        cfg->fps = datum.u.i == 30 ? CHIAKI_VIDEO_FPS_PRESET_30 : CHIAKI_VIDEO_FPS_PRESET_60;
-      } else {
-        cfg->fps = CHIAKI_VIDEO_FPS_PRESET_30;
+        if (datum.u.i != 30) LOGD("Ignoring config file fps and setting to 30.");
       }
+
       datum = toml_string_in(settings, "psn_account_id");
       if (datum.ok) {
         cfg->psn_account_id = datum.u.s;
