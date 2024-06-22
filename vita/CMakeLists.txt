@@ -15,6 +15,7 @@ add_executable(${VITA_APP_NAME}.elf
     src/host.c
     src/video.c
     src/audio.c
+    src/message_log.c
 
     third_party/tomlc99/toml.c
     third_party/h264-bitstream/h264_nal.c
@@ -101,6 +102,8 @@ if(CHIAKI_IS_VITA)
         FILE res/assets/btn_register.png assets/btn_register.png
         FILE res/assets/btn_settings_active.png assets/btn_settings_active.png
         FILE res/assets/btn_settings.png assets/btn_settings.png
+        FILE res/assets/btn_messages_active.png assets/btn_messages_active.png
+        FILE res/assets/btn_messages.png assets/btn_messages.png
         FILE res/assets/discovered_host.png assets/discovered_host.png
         FILE res/assets/header_logo.png assets/header_logo.png
         FILE res/assets/ps4_off.png assets/ps4_off.png
@@ -110,5 +113,6 @@ if(CHIAKI_IS_VITA)
         FILE res/assets/ps5.png assets/ps5.png
         FILE res/assets/ps5_rest.png assets/ps5_rest.png
         FILE res/assets/fonts/Roboto-Regular.ttf assets/fonts/Roboto-Regular.ttf
+        FILE res/assets/fonts/RobotoMono-Regular.ttf assets/fonts/RobotoMono-Regular.ttf
     )
 endif()

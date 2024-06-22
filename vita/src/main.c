@@ -165,4 +165,7 @@ int main(int argc, char* argv[]) {
   draw_ui();
 
   // TODO: Cleanup
+  if (context.mlog) {
+    free(context.mlog);
+  }
 }

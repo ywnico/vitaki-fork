@@ -15,10 +15,14 @@
 #include "util.h"
 
 #define COLOR_WHITE RGBA8(255, 255, 255, 255)
+#define COLOR_GRAY50 RGBA8(129, 129, 129, 255)
 #define COLOR_BLACK RGBA8(0, 0, 0, 255)
 #define COLOR_ACTIVE RGBA8(255, 170, 238, 255)
 #define COLOR_TILE_BG RGBA8(51, 51, 51, 255)
 #define COLOR_BANNER RGBA8(22, 45, 80, 255)
+
+#define VITA_WIDTH 960
+#define VITA_HEIGHT 544
 
 #define HEADER_BAR_X 136
 #define HEADER_BAR_Y 45
@@ -41,6 +45,8 @@
   TEXTURE_PATH "btn_discovery_off_active.png"
 #define BTN_SETTINGS_PATH TEXTURE_PATH "btn_settings.png"
 #define BTN_SETTINGS_ACTIVE_PATH TEXTURE_PATH "btn_settings_active.png"
+#define BTN_MESSAGES_PATH TEXTURE_PATH "btn_messages.png"
+#define BTN_MESSAGES_ACTIVE_PATH TEXTURE_PATH "btn_messages_active.png"
 #define IMG_PS4_PATH TEXTURE_PATH "ps4.png"
 #define IMG_PS4_OFF_PATH TEXTURE_PATH "ps4_off.png"
 #define IMG_PS4_REST_PATH TEXTURE_PATH "ps4_rest.png"
@@ -51,9 +57,11 @@
 #define IMG_HEADER_LOGO_PATH TEXTURE_PATH "header_logo.png"
 
 vita2d_font* font;
+vita2d_font* font_mono;
 vita2d_texture *btn_register, *btn_register_active, *btn_add, *btn_add_active,
     *btn_discovery, *btn_discovery_active, *btn_discovery_off,
-    *btn_discovery_off_active, *btn_settings, *btn_settings_active, *img_ps4,
+    *btn_discovery_off_active, *btn_settings, *btn_settings_active,
+    *btn_messages, *btn_messages_active, *img_ps4,
     *img_ps4_off, *img_ps4_rest, *img_ps5, *img_ps5_off, *img_ps5_rest,
     *img_header, *img_discovery_host;
 
@@ -62,6 +70,7 @@ typedef enum ui_main_widget_id_t {
   UI_MAIN_WIDGET_ADD_HOST_BTN,
   UI_MAIN_WIDGET_REGISTER_BTN,
   UI_MAIN_WIDGET_DISCOVERY_BTN,
+  UI_MAIN_WIDGET_MESSAGES_BTN,
   UI_MAIN_WIDGET_SETTINGS_BTN,
 
   // FIXME: this is bound to fail REALLY fast if we start adding more inputs in the future
@@ -90,6 +99,7 @@ typedef enum ui_screen_type_t {
   UI_SCREEN_TYPE_EDIT_HOST,
   UI_SCREEN_TYPE_STREAM,
   UI_SCREEN_TYPE_SETTINGS,
+  UI_SCREEN_TYPE_MESSAGES,
 } UIScreenType;
 
 /// Check if a button has been newly pressed
@@ -111,6 +121,8 @@ void load_textures() {
   btn_register_active = vita2d_load_PNG_file(BTN_REGISTER_ACTIVE_PATH);
   btn_settings = vita2d_load_PNG_file(BTN_SETTINGS_PATH);
   btn_settings_active = vita2d_load_PNG_file(BTN_SETTINGS_ACTIVE_PATH);
+  btn_messages = vita2d_load_PNG_file(BTN_MESSAGES_PATH);
+  btn_messages_active = vita2d_load_PNG_file(BTN_MESSAGES_ACTIVE_PATH);
   img_header = vita2d_load_PNG_file(IMG_HEADER_LOGO_PATH);
   img_ps4 = vita2d_load_PNG_file(IMG_PS4_PATH);
   img_ps4_off = vita2d_load_PNG_file(IMG_PS4_OFF_PATH);
@@ -427,17 +439,18 @@ UIScreenType draw_header_bar() {
 
   // Header buttons
   UIScreenType next_screen = UI_SCREEN_TYPE_MAIN;
-  if (header_button(UI_MAIN_WIDGET_ADD_HOST_BTN, 360, btn_add,
+  if (header_button(UI_MAIN_WIDGET_ADD_HOST_BTN, 315, btn_add,
                     btn_add_active)) {
     next_screen = UI_SCREEN_TYPE_ADD_HOST;
   }
-  if (header_button(UI_MAIN_WIDGET_REGISTER_BTN, 520, btn_register,
+  if (header_button(UI_MAIN_WIDGET_REGISTER_BTN, 475, btn_register,
                     btn_register_active)) {
-    next_screen = UI_SCREEN_TYPE_REGISTER;
+    // TODO what was this button supposed to do??
+    //next_screen = UI_SCREEN_TYPE_REGISTER;
   }
   bool discovery_on = context.discovery_enabled;
   if (header_button(
-          UI_MAIN_WIDGET_DISCOVERY_BTN, 684,
+          UI_MAIN_WIDGET_DISCOVERY_BTN, 639,
           discovery_on ? btn_discovery : btn_discovery_off,
           discovery_on ? btn_discovery_active : btn_discovery_off_active)) {
     if (discovery_on) {
@@ -445,6 +458,10 @@ UIScreenType draw_header_bar() {
     } else {
       start_discovery(NULL, NULL);
     }
+  }
+  if (header_button(UI_MAIN_WIDGET_MESSAGES_BTN, 684, btn_messages,
+                    btn_messages_active)) {
+    next_screen = UI_SCREEN_TYPE_MESSAGES;
   }
   if (header_button(UI_MAIN_WIDGET_SETTINGS_BTN, 729, btn_settings,
                     btn_settings_active)) {
@@ -474,13 +491,49 @@ UIScreenType draw_main_menu() {
   } else if (host_action == UI_HOST_ACTION_WAKEUP) {
     host_wakeup(context.active_host);
   } else if (host_action == UI_HOST_ACTION_STREAM) {
-    next_screen = UI_SCREEN_TYPE_STREAM;
+    next_screen = UI_SCREEN_TYPE_MESSAGES;
   } else if (host_action == UI_HOST_ACTION_EDIT) {
     next_screen = UI_SCREEN_TYPE_REGISTER_HOST;
     // next_screen = UI_SCREEN_TYPE_EDIT_HOST;
   } else if (host_action == UI_HOST_ACTION_REGISTER) {
     next_screen = UI_SCREEN_TYPE_REGISTER_HOST;
   }
+
+
+  // Add "tooltip" in bottom of screen
+  int font_size = 18;
+  int tooltip_x = 10;
+  int tooltip_y = VITA_HEIGHT - font_size;
+  char* tooltip_msg = "";
+
+  switch (context.ui_state.active_item) {
+  case UI_MAIN_WIDGET_ADD_HOST_BTN:
+    tooltip_msg = "Manually add host (functionality currently disabled; wait for discovery instead)";
+    break;
+  case UI_MAIN_WIDGET_REGISTER_BTN:
+    tooltip_msg = "Manually register (functionality currently disabled)";
+    break;
+  case UI_MAIN_WIDGET_DISCOVERY_BTN:
+    tooltip_msg = (context.discovery_enabled) ? "Turn off discovery" : "Turn on discovery";
+    break;
+  case UI_MAIN_WIDGET_MESSAGES_BTN:
+    tooltip_msg = "View log";
+    break;
+  case UI_MAIN_WIDGET_SETTINGS_BTN:
+    tooltip_msg = "Settings";
+    break;
+  default:
+    tooltip_msg = "";
+  }
+
+  if (strlen(tooltip_msg)) {
+    vita2d_font_draw_text(font, tooltip_x, tooltip_y,
+                          COLOR_WHITE, font_size,
+                          tooltip_msg
+                          );
+  }
+
+
   return next_screen;
 }
 char* PSNID_LABEL = "PSN ID";
@@ -512,13 +565,16 @@ char* LINK_CODE_LABEL = "Registration code";
 bool draw_registration_dialog() { 
   char* text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 1, 30, 30, 600, 80, LINK_CODE_LABEL, LINK_CODE, 8);
   if (text != NULL) {
-    // LOGD("text is %s", text);
-    free(LINK_CODE);
+    if (LINK_CODE != NULL) free(LINK_CODE);
     LINK_CODE = text;
-  }
+    }
   if (btn_pressed(SCE_CTRL_CIRCLE)) {
-    LOGD("size of lcode %d", strlen(LINK_CODE));
-    if (strlen(LINK_CODE) != 0) host_register(context.active_host, atoi(LINK_CODE));
+    if ((LINK_CODE != NULL) && (strlen(LINK_CODE) != 0)) {
+      LOGD("User input link code: %s", LINK_CODE);
+      host_register(context.active_host, atoi(LINK_CODE));
+    } else {
+      LOGD("User exited registration screen without inputting link code");
+    }
     context.ui_state.next_active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
     // free(context.config.psn_account_id);
     // context.config.psn_account_id = NULL;
@@ -548,11 +604,134 @@ bool draw_stream() {
   return false;
 }
 
+/// Draw the debug messages screen
+/// @return whether the dialog should keep rendering
+bool draw_messages() {
+  vita2d_set_clear_color(RGBA8(0x00, 0x00, 0x00, 0xFF));
+  context.ui_state.next_active_item = -1;
+
+  // initialize mlog_line_offset
+  if (!context.ui_state.mlog_last_update) context.ui_state.mlog_line_offset = -1;
+  if (context.ui_state.mlog_last_update != context.mlog->last_update) {
+    context.ui_state.mlog_last_update = context.mlog->last_update;
+    context.ui_state.mlog_line_offset = -1;
+  }
+
+
+  int w = VITA_WIDTH;
+  int h = VITA_HEIGHT;
+
+  int left_margin = 12;
+  int top_margin = 20;
+  int bottom_margin = 20;
+  int font_size = 18;
+  int line_height = font_size + 2;
+
+  // compute lines to print
+  // TODO enable scrolling etc
+  int max_lines = (h - top_margin - bottom_margin) / line_height;
+  bool overflow = (context.mlog->lines > max_lines);
+
+  int max_line_offset = 0;
+  if (overflow) {
+    max_line_offset = context.mlog->lines - max_lines + 1;
+  } else {
+    max_line_offset = 0;
+    context.ui_state.mlog_line_offset = -1;
+  }
+  int line_offset = max_line_offset;
+
+  // update line offset according to mlog_line_offset
+  if (context.ui_state.mlog_line_offset >= 0) {
+    if (context.ui_state.mlog_line_offset <= max_line_offset) {
+      line_offset = context.ui_state.mlog_line_offset;
+    }
+  }
+
+  int y = top_margin;
+  int i_y = 0;
+  if (overflow && (line_offset > 0)) {
+    char note[100];
+    if (line_offset == 1) {
+      snprintf(note, 100, "<%d line above>", line_offset);
+    } else {
+      snprintf(note, 100, "<%d lines above>", line_offset);
+    }
+    vita2d_font_draw_text(font_mono, left_margin, y,
+                          COLOR_GRAY50, font_size,
+                          note
+                          );
+    y += line_height;
+    i_y ++;
+  }
+
+  int j;
+  for (j = line_offset; j < context.mlog->lines; j++) {
+    if (i_y > max_lines - 1) break;
+    if (overflow && (i_y == max_lines - 1)) {
+      if (j < context.mlog->lines - 1) break;
+    }
+    vita2d_font_draw_text(font_mono, left_margin, y,
+                          COLOR_WHITE, font_size,
+                          get_message_log_line(context.mlog, j)
+                          );
+    y += line_height;
+    i_y ++;
+  }
+  if (overflow && (j < context.mlog->lines - 1)) {
+    char note[100];
+    int lines_below = context.mlog->lines - j - 1;
+    if (lines_below == 1) {
+      snprintf(note, 100, "<%d line below>", lines_below);
+    } else {
+      snprintf(note, 100, "<%d lines below>", lines_below);
+    }
+    vita2d_font_draw_text(font_mono, left_margin, y,
+                          COLOR_GRAY50, font_size,
+                          note
+                          );
+    y += line_height;
+    i_y ++;
+  }
+
+  if (btn_pressed(SCE_CTRL_UP)) {
+    if (overflow) {
+      int next_offset = line_offset - 1;
+
+      if (next_offset == 1) next_offset = 0;
+      if (next_offset == max_line_offset-1) next_offset = max_line_offset-2;
+
+      if (next_offset < 0) next_offset = line_offset;
+      context.ui_state.mlog_line_offset = next_offset;
+    }
+  }
+  if (btn_pressed(SCE_CTRL_DOWN)) {
+    if (overflow) {
+      int next_offset = line_offset + 1;
+
+      if (next_offset == max_line_offset - 1) next_offset = max_line_offset;
+      if (next_offset == 1) next_offset = 2;
+
+      if (next_offset > max_line_offset) next_offset = max_line_offset;
+      context.ui_state.mlog_line_offset = next_offset;
+    }
+  }
+
+  if (btn_pressed(SCE_CTRL_CIRCLE)) {
+    // TODO abort connection if connecting
+    vita2d_set_clear_color(RGBA8(0x40, 0x40, 0x40, 0xFF));
+    context.ui_state.next_active_item = UI_MAIN_WIDGET_MESSAGES_BTN;
+    return false;
+  }
+  return true;
+}
+
 void init_ui() {
   vita2d_init();
   vita2d_set_clear_color(RGBA8(0x40, 0x40, 0x40, 0xFF));
   load_textures();
   font = vita2d_load_font_file("app0:/assets/fonts/Roboto-Regular.ttf");
+  font_mono = vita2d_load_font_file("app0:/assets/fonts/RobotoMono-Regular.ttf");
   vita2d_set_vblank_wait(true);
 }
 
@@ -605,6 +784,10 @@ void draw_ui() {
           }
         } else if (screen == UI_SCREEN_TYPE_EDIT_HOST) {
           if (!draw_edit_host_dialog()) {
+            screen = UI_SCREEN_TYPE_MAIN;
+          }
+        } else if (screen == UI_SCREEN_TYPE_MESSAGES) {
+          if (!draw_messages()) {
             screen = UI_SCREEN_TYPE_MAIN;
           }
         } else if (screen == UI_SCREEN_TYPE_STREAM) {

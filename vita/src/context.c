@@ -4,6 +4,7 @@
 
 #include "stdlib.h"
 
+#include "message_log.h"
 #include "context.h"
 #include "config.h"
 
@@ -30,6 +31,11 @@ void log_cb_debugnet(ChiakiLogLevel lvl, const char *msg, void *user) {
   if (lvl == CHIAKI_LOG_ALL || lvl == CHIAKI_LOG_VERBOSE) return;
   // uint64_t timestamp = sceKernelGetProcessTimeWide();
   sceClibPrintf("[CHIAKI] %s\n", msg);
+  if (!context.stream.is_streaming) {
+      if (context.mlog) {
+        write_message_log(context.mlog, msg);
+      }
+    }
 }
 
 bool vita_chiaki_init_context() {
@@ -38,5 +44,9 @@ bool vita_chiaki_init_context() {
   // TODO: Load log level from config
   // TODO: Custom logging callback that logs to a file
   chiaki_log_init(&(context.log), CHIAKI_LOG_ALL & ~(CHIAKI_LOG_VERBOSE | CHIAKI_LOG_DEBUG), &log_cb_debugnet, NULL);
+  context.mlog = message_log_create();
+
+  write_message_log(context.mlog, "----- Debug log start -----"); // debug
+
   return true;
 }

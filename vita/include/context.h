@@ -8,17 +8,32 @@
 #include "config.h"
 #include "discovery.h"
 #include "host.h"
+#include "message_log.h"
 #include "ui.h"
 // #include "debugnet.h"
 
 #define LOGD(fmt, ...) do {\
     uint64_t timestamp = sceKernelGetProcessTimeWide(); \
     sceClibPrintf("[DEBUG] %ju "fmt"\n", timestamp __VA_OPT__(,) __VA_ARGS__); \
+    if (!context.stream.is_streaming) { \
+        if (context.mlog) { \
+          char msg[800]; \
+          sceClibSnprintf(msg, 800, "[DEBUG] %ju "fmt"\n", timestamp __VA_OPT__(,) __VA_ARGS__); \
+          write_message_log(context.mlog, msg); \
+        } \
+      } \
   } while (0)
   //debugNetPrintf(DEBUG, "%ju "fmt"\n", timestamp __VA_OPT__(,) __VA_ARGS__);
 #define LOGE(fmt, ...) do {\
     uint64_t timestamp = sceKernelGetProcessTimeWide(); \
     sceClibPrintf("[ERROR] %ju "fmt"\n", timestamp __VA_OPT__(,) __VA_ARGS__); \
+    if (!context.stream.is_streaming) { \
+        if (context.mlog) { \
+          char msg[800]; \
+          sceClibSnprintf(msg, 800, "[ERROR] %ju "fmt"\n", timestamp __VA_OPT__(,) __VA_ARGS__); \
+          write_message_log(context.mlog, msg); \
+        } \
+      } \
   } while (0)
   //debugNetPrintf(ERROR, "%ju "fmt"\n", timestamp __VA_OPT__(,) __VA_ARGS__);
 
@@ -43,6 +58,7 @@ typedef struct vita_chiaki_context_t {
   VitaChiakiConfig config;
   VitaChiakiUIState ui_state;
   uint8_t num_hosts;
+  VitaChiakiMessageLog* mlog;
 } VitaChiakiContext;
 
 /// Global context singleton

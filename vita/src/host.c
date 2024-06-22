@@ -238,6 +238,7 @@ static void *input_thread_func(void* user) {
 }
 
 int host_stream(VitaChiakiHost* host) {
+  LOGD("Preparing to start host_stream");
   if (!host->hostname || !host->registered_state) {
     return 1;
   }
