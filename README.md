@@ -10,11 +10,12 @@ This is ywnico's fork of [aa's Vitaki](https://git.catvibers.me/aa/chiaki) with 
     | Touchpad (trapezoid button) | front touch screen |
     | Left analog stick button | `D-pad left` + `Square` |
     | Right analog stick button | `D-pad right` + `Circle` |
-3. Included [ghost's LiveArea icon fixes](https://git.catvibers.me/aa/chiaki/pulls/13)
-4. Disabled `vblank_wait` (reduces lag)
-5. Default fps to 30 (reduces lag).
+4. Disabled `vblank_wait` and set fps to 30 to reduce lag.
     - NOTE: the fps in the config file (`chiaki.toml`) will be ignored
+5. Made debug logs visible, added tooltips on some buttons
 6. Merged in updates from chiaki4deck (improved some connection issues)
+7. Included [ghost's LiveArea icon fixes](https://git.catvibers.me/aa/chiaki/pulls/13)
+8. Various bug and crash fixes
 
 # Chiaki
 
