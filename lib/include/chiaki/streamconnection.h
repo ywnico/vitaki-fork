@@ -62,6 +62,11 @@ typedef struct chiaki_stream_connection_t
 	bool should_stop;
 	bool remote_disconnected;
 	char *remote_disconnect_reason;
+	// FIXME ywnico a workaround to deal with bang being called twice
+	// I'm not sure what the real problem is...something with the threading implementation on vita...?
+	#if defined(__PSVITA__)
+	bool streaminfo_called_from_bang;
+	#endif
 
 	double measured_bitrate;
 } ChiakiStreamConnection;
