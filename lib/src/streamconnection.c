@@ -237,9 +237,14 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnectio
 		goto disconnect;
 	}
 
+	// NOTE (ywnico) is this getting stuck even though bang was received?? or running twice?? something wrong with the vita implementation of chiaki_cond_timedwait?
 	err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, &stream_connection->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, stream_connection);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 	CHECK_STOP(disconnect);
+
+#if defined(__PSVITA__)
+	if (!stream_connection->streaminfo_called_from_bang) {
+#endif
 
 	if(!stream_connection->state_finished)
 	{
@@ -259,6 +264,11 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_stream_connection_run(ChiakiStreamConnectio
 	err = chiaki_cond_timedwait_pred(&stream_connection->state_cond, &stream_connection->state_mutex, EXPECT_TIMEOUT_MS, state_finished_cond_check, stream_connection);
 	assert(err == CHIAKI_ERR_SUCCESS || err == CHIAKI_ERR_TIMEOUT);
 	CHECK_STOP(disconnect);
+
+#if defined(__PSVITA__)
+	}
+	stream_connection->streaminfo_called_from_bang = false;
+#endif
 
 	if(!stream_connection->state_finished)
 	{
@@ -418,12 +428,15 @@ static void stream_connection_takion_data_protobuf(ChiakiStreamConnection *strea
 	switch(stream_connection->state)
 	{
 		case STATE_EXPECT_BANG:
+			CHIAKI_LOGI(stream_connection->log, "Calling stream_connection_takion_data_expect_bang");
 			stream_connection_takion_data_expect_bang(stream_connection, buf, buf_size);
 			break;
 		case STATE_EXPECT_STREAMINFO:
+			CHIAKI_LOGI(stream_connection->log, "Calling stream_connection_takion_data_expect_streaminfo");
 			stream_connection_takion_data_expect_streaminfo(stream_connection, buf, buf_size);
 			break;
 		default: // STATE_IDLE
+			//CHIAKI_LOGI(stream_connection->log, "Calling stream_connection_takion_data_idle");
 			stream_connection_takion_data_idle(stream_connection, buf, buf_size);
 			break;
 	}
@@ -599,6 +612,17 @@ static void stream_connection_takion_data_expect_bang(ChiakiStreamConnection *st
 			stream_connection_takion_data_handle_disconnect(stream_connection, buf, buf_size);
 			return;
 		}
+#if defined(__PSVITA__)
+		// FIXME ywnico this is a weird workaround...
+		if(msg.type == tkproto_TakionMessage_PayloadType_STREAMINFO)
+		{
+			CHIAKI_LOGE(stream_connection->log, "StreamConnection expected bang payload but received streaminfo payload (%d)", msg.type);
+			chiaki_log_hexdump(stream_connection->log, CHIAKI_LOG_VERBOSE, buf, buf_size);
+			stream_connection->streaminfo_called_from_bang = true;
+			stream_connection_takion_data_expect_streaminfo(stream_connection, buf, buf_size);
+			return;
+		}
+#endif
 
 		CHIAKI_LOGE(stream_connection->log, "StreamConnection expected bang payload but received something else: %d", msg.type);
 		chiaki_log_hexdump(stream_connection->log, CHIAKI_LOG_VERBOSE, buf, buf_size);
@@ -661,6 +685,7 @@ static void stream_connection_takion_data_expect_bang(ChiakiStreamConnection *st
 	}
 
 	// stream_connection->state_mutex is expected to be locked by the caller of this function
+	CHIAKI_LOGI(stream_connection->log, "Completed stream_connection_takion_data_expect_bang");
 	stream_connection->state_finished = true;
 	chiaki_cond_signal(&stream_connection->state_cond);
 	return;
@@ -751,7 +776,7 @@ static void stream_connection_takion_data_expect_streaminfo(ChiakiStreamConnecti
 			return;
 		}
 
-		CHIAKI_LOGE(stream_connection->log, "StreamConnection expected streaminfo payload but received something else");
+		CHIAKI_LOGE(stream_connection->log, "StreamConnection expected streaminfo payload but received something else: %d", msg.type);
 		chiaki_log_hexdump(stream_connection->log, CHIAKI_LOG_VERBOSE, buf, buf_size);
 		return;
 	}
@@ -792,6 +817,7 @@ static void stream_connection_takion_data_expect_streaminfo(ChiakiStreamConnecti
 	}
 
 	// stream_connection->state_mutex is expected to be locked by the caller of this function
+	CHIAKI_LOGI(stream_connection->log, "Completed stream_connection_takion_data_expect_streaminfo");
 	stream_connection->state_finished = true;
 	chiaki_cond_signal(&stream_connection->state_cond);
 	return;
@@ -906,6 +932,7 @@ static ChiakiErrorCode stream_connection_send_big(ChiakiStreamConnection *stream
 	mtu -= 50;
 	uint32_t buf_pos = 0;
 	bool first = true;
+	CHIAKI_LOGI(stream_connection->log, "Reached stream_connection_send_big loop");
 	while((mtu < total_size + 26) || (mtu < total_size + 25 && !first))
 	{
 		if(first)
@@ -929,6 +956,7 @@ static ChiakiErrorCode stream_connection_send_big(ChiakiStreamConnection *stream
 		else
 		  err = chiaki_takion_send_message_data_cont(&stream_connection->takion, 1, 1, buf + buf_pos, total_size, NULL);
 	}
+	CHIAKI_LOGI(stream_connection->log, "Completed stream_connection_send_big");
 	return err;
 }
 
