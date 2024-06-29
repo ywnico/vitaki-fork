@@ -2,7 +2,7 @@
 
 This is ywnico's fork of [aa's Vitaki](https://git.catvibers.me/aa/chiaki) with the following updates:
 1. Implemented audio
-2. Added the following control mappings:
+2. Added more control mappings. The full set is now:
     | Map sent to PS4/5 | Vita controls |
     | -----|----- |
     | `L2` | `L1` + left side of rear touch sensor |
@@ -10,6 +10,8 @@ This is ywnico's fork of [aa's Vitaki](https://git.catvibers.me/aa/chiaki) with 
     | Touchpad (trapezoid button) | front touch screen |
     | Left analog stick button | `D-pad left` + `Square` |
     | Right analog stick button | `D-pad right` + `Circle` |
+    | PS (home) button | `Select` + `Start` |
+3. Fixed instant deconnection bug
 4. Disabled `vblank_wait` and set fps to 30 to reduce lag.
     - NOTE: the fps in the config file (`chiaki.toml`) will be ignored
 5. Made debug logs visible, added tooltips on some buttons
