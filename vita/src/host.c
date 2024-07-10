@@ -14,7 +14,33 @@
 
 void host_init(VitaChiakiHost* host) {
 
-  // TODO set up controller maps
+  // TODO set up alternate controller maps
+  memset(vitaki_ctrl_in_out_map, 0, VITAKI_CTRL_IN_COUNT);
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_L1]                  = VITAKI_CTRL_OUT_L1;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_R1]                  = VITAKI_CTRL_OUT_R1;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_L3]                  = VITAKI_CTRL_OUT_L3;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_R3]                  = VITAKI_CTRL_OUT_R3;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_SELECT_START]        = VITAKI_CTRL_OUT_PS;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_LEFT_SQUARE]         = VITAKI_CTRL_OUT_L3;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_RIGHT_CIRCLE]        = VITAKI_CTRL_OUT_R3;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_UL]        = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_UR]        = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_LL]        = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_LR]        = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_LEFT]      = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_RIGHT]     = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_ANY]       = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_LEFT_L1]   = VITAKI_CTRL_OUT_L2;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_RIGHT_R1]  = VITAKI_CTRL_OUT_R2;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_UL]       = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_UR]       = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_LL]       = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_LR]       = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_LEFT]     = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_RIGHT]    = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_ANY]      = VITAKI_CTRL_OUT_TOUCHPAD;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_LEFT_L1]  = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_RIGHT_R1] = VITAKI_CTRL_OUT_NONE;
   
 }
 
@@ -244,49 +270,53 @@ static void *input_thread_func(void* user) {
       if (ctrl.buttons & SCE_CTRL_L1) vitaki_ctrl_in_state[VITAKI_CTRL_IN_L1] = true;
       if (ctrl.buttons & SCE_CTRL_R1) vitaki_ctrl_in_state[VITAKI_CTRL_IN_R1] = true;
 
-      // Select + Start = PS
-      if ((ctrl.buttons & SCE_CTRL_SELECT) && (ctrl.buttons & SCE_CTRL_START)) {
-        // TODO if mapped
-        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_SHARE;
-        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_OPTIONS;
-        vitaki_ctrl_in_state[VITAKI_CTRL_IN_SELECT_START] = true;
+      // Select + Start
+      if (vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_SELECT_START]) {
+        if ((ctrl.buttons & SCE_CTRL_SELECT) && (ctrl.buttons & SCE_CTRL_START)) {
+          stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_SHARE;
+          stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_OPTIONS;
+          vitaki_ctrl_in_state[VITAKI_CTRL_IN_SELECT_START] = true;
+        }
       }
 
       // Rear touch screen left + L1 = L2
-      if (vitaki_ctrl_in_state[VITAKI_CTRL_IN_REARTOUCH_LEFT] && (ctrl.buttons & SCE_CTRL_L1)) {
-        // TODO if mapped
-        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_L1;
-        vitaki_ctrl_in_state[VITAKI_CTRL_IN_REARTOUCH_LEFT_L1] = true;
+      if (vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_LEFT_L1]) {
+        if (vitaki_ctrl_in_state[VITAKI_CTRL_IN_REARTOUCH_LEFT] && (ctrl.buttons & SCE_CTRL_L1)) {
+          stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_L1;
+          vitaki_ctrl_in_state[VITAKI_CTRL_IN_REARTOUCH_LEFT_L1] = true;
+        }
       }
       // Rear touch screen right + R1 = R2
-      if (vitaki_ctrl_in_state[VITAKI_CTRL_IN_REARTOUCH_RIGHT] && (ctrl.buttons & SCE_CTRL_R1)) {
-        // TODO if mapped
-        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_R1;
-        vitaki_ctrl_in_state[VITAKI_CTRL_IN_REARTOUCH_RIGHT_R1] = true;
+      if (vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_RIGHT_R1]) {
+        if (vitaki_ctrl_in_state[VITAKI_CTRL_IN_REARTOUCH_RIGHT] && (ctrl.buttons & SCE_CTRL_R1)) {
+          stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_R1;
+          vitaki_ctrl_in_state[VITAKI_CTRL_IN_REARTOUCH_RIGHT_R1] = true;
+        }
       }
 
       // Dpad-left + Square = left analog push
-      if ((ctrl.buttons & SCE_CTRL_LEFT) && (ctrl.buttons & SCE_CTRL_SQUARE)) {
-        // TODO if mapped
-        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_DPAD_LEFT;
-        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_BOX;
-        vitaki_ctrl_in_state[VITAKI_CTRL_IN_LEFT_SQUARE] = true;
+      if (vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_LEFT_SQUARE]) {
+        if ((ctrl.buttons & SCE_CTRL_LEFT) && (ctrl.buttons & SCE_CTRL_SQUARE)) {
+          stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_DPAD_LEFT;
+          stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_BOX;
+          vitaki_ctrl_in_state[VITAKI_CTRL_IN_LEFT_SQUARE] = true;
+        }
       }
       // Dpad-right + Circle = right analog push
-      if ((ctrl.buttons & SCE_CTRL_RIGHT) && (ctrl.buttons & SCE_CTRL_CIRCLE)) {
-        // TODO if mapped
-        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_DPAD_RIGHT;
-        stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_MOON;
-        vitaki_ctrl_in_state[VITAKI_CTRL_IN_RIGHT_CIRCLE] = true;
+      if (vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_RIGHT_CIRCLE]) {
+        if ((ctrl.buttons & SCE_CTRL_RIGHT) && (ctrl.buttons & SCE_CTRL_CIRCLE)) {
+          stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_DPAD_RIGHT;
+          stream->controller_state.buttons &= ~CHIAKI_CONTROLLER_BUTTON_MOON;
+          vitaki_ctrl_in_state[VITAKI_CTRL_IN_RIGHT_CIRCLE] = true;
+        }
       }
 
-      // TODO configurable map
-      if (vitaki_ctrl_in_state[VITAKI_CTRL_IN_SELECT_START])       set_ctrl_out(stream, VITAKI_CTRL_OUT_PS);
-      if (vitaki_ctrl_in_state[VITAKI_CTRL_IN_FRONTTOUCH_ANY])     set_ctrl_out(stream, VITAKI_CTRL_OUT_TOUCHPAD);
-      if (vitaki_ctrl_in_state[VITAKI_CTRL_IN_REARTOUCH_LEFT_L1])  set_ctrl_out(stream, VITAKI_CTRL_OUT_L2);
-      if (vitaki_ctrl_in_state[VITAKI_CTRL_IN_REARTOUCH_RIGHT_R1]) set_ctrl_out(stream, VITAKI_CTRL_OUT_R2);
-      if (vitaki_ctrl_in_state[VITAKI_CTRL_IN_LEFT_SQUARE])        set_ctrl_out(stream, VITAKI_CTRL_OUT_L3);
-      if (vitaki_ctrl_in_state[VITAKI_CTRL_IN_RIGHT_CIRCLE])       set_ctrl_out(stream, VITAKI_CTRL_OUT_R3);
+      // Set controls according to vitaki_ctrl_in_out_map
+      for (int vitaki_ctrl_in_j = 0; vitaki_ctrl_in_j < VITAKI_CTRL_IN_COUNT; vitaki_ctrl_in_j++) {
+        if (vitaki_ctrl_in_state[vitaki_ctrl_in_j]) {
+          set_ctrl_out(stream, vitaki_ctrl_in_out_map[vitaki_ctrl_in_j]);
+        }
+      }
 
       chiaki_session_set_controller_state(&stream->session, &stream->controller_state);
       // LOGD("ly 0x%x %d", ctrl.ly, ctrl.ly);

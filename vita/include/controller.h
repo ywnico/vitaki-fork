@@ -65,3 +65,4 @@ typedef enum vitaki_ctrl_out_t {
 } VitakiCtrlOut;
 
 int vitaki_ctrl_in_state[VITAKI_CTRL_IN_COUNT];
+int vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_COUNT];
