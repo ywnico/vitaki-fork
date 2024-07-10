@@ -61,6 +61,7 @@ typedef enum vitaki_ctrl_out_t {
   VITAKI_CTRL_OUT_L2       = 3,
   VITAKI_CTRL_OUT_R2       = 7,
 
+  // VITAKI_CTRL_OUT_NONE must be 0 for logic to work
   VITAKI_CTRL_OUT_NONE     = 0,
 } VitakiCtrlOut;
 
