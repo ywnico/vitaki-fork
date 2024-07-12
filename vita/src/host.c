@@ -13,35 +13,6 @@
 #include <chiaki/session.h>
 
 void host_init(VitaChiakiHost* host) {
-
-  // TODO set up alternate controller maps
-  memset(vitaki_ctrl_in_out_map, 0, VITAKI_CTRL_IN_COUNT);
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_L1]                  = VITAKI_CTRL_OUT_L1;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_R1]                  = VITAKI_CTRL_OUT_R1;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_L3]                  = VITAKI_CTRL_OUT_L3;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_R3]                  = VITAKI_CTRL_OUT_R3;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_SELECT_START]        = VITAKI_CTRL_OUT_PS;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_LEFT_SQUARE]         = VITAKI_CTRL_OUT_L3;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_RIGHT_CIRCLE]        = VITAKI_CTRL_OUT_R3;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_UL]        = VITAKI_CTRL_OUT_NONE;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_UR]        = VITAKI_CTRL_OUT_NONE;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_LL]        = VITAKI_CTRL_OUT_NONE;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_LR]        = VITAKI_CTRL_OUT_NONE;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_LEFT]      = VITAKI_CTRL_OUT_NONE;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_RIGHT]     = VITAKI_CTRL_OUT_NONE;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_ANY]       = VITAKI_CTRL_OUT_NONE;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_LEFT_L1]   = VITAKI_CTRL_OUT_L2;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_RIGHT_R1]  = VITAKI_CTRL_OUT_R2;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_UL]       = VITAKI_CTRL_OUT_NONE;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_UR]       = VITAKI_CTRL_OUT_NONE;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_LL]       = VITAKI_CTRL_OUT_NONE;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_LR]       = VITAKI_CTRL_OUT_NONE;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_LEFT]     = VITAKI_CTRL_OUT_NONE;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_RIGHT]    = VITAKI_CTRL_OUT_NONE;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_ANY]      = VITAKI_CTRL_OUT_TOUCHPAD;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_LEFT_L1]  = VITAKI_CTRL_OUT_NONE;
-  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_RIGHT_R1] = VITAKI_CTRL_OUT_NONE;
-  
 }
 
 void host_free(VitaChiakiHost* host) {
@@ -181,7 +152,8 @@ static void *input_thread_func(void* user) {
 
   while (true) {
 
-    memset(vitaki_ctrl_in_state, 0, VITAKI_CTRL_IN_COUNT);
+    // reset vitaki_ctrl_in_state
+    memset(vitaki_ctrl_in_state, 0, sizeof(vitaki_ctrl_in_state));
 
     // TODO enable using triggers as L2, R2
     // TODO enable home button, with long hold sent back to Vita?
@@ -363,6 +335,35 @@ int host_stream(VitaChiakiHost* host) {
 	chiaki_session_set_audio_sink(&context.stream.session, &audio_sink);
   chiaki_session_set_video_sample_cb(&context.stream.session, video_cb, NULL);
 	chiaki_session_set_event_cb(&context.stream.session, event_cb, NULL);
+
+  // init controller map
+  // TODO move this elsewhere and make configurable
+  memset(vitaki_ctrl_in_out_map, 0, sizeof(vitaki_ctrl_in_out_map));
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_L1]                  = VITAKI_CTRL_OUT_L1;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_R1]                  = VITAKI_CTRL_OUT_R1;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_L3]                  = VITAKI_CTRL_OUT_L3;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_R3]                  = VITAKI_CTRL_OUT_R3;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_SELECT_START]        = VITAKI_CTRL_OUT_PS;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_LEFT_SQUARE]         = VITAKI_CTRL_OUT_L3;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_RIGHT_CIRCLE]        = VITAKI_CTRL_OUT_R3;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_UL]        = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_UR]        = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_LL]        = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_LR]        = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_LEFT]      = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_RIGHT]     = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_ANY]       = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_LEFT_L1]   = VITAKI_CTRL_OUT_L2;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_REARTOUCH_RIGHT_R1]  = VITAKI_CTRL_OUT_R2;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_UL]       = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_UR]       = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_LL]       = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_LR]       = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_LEFT]     = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_RIGHT]    = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_ANY]      = VITAKI_CTRL_OUT_TOUCHPAD;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_LEFT_L1]  = VITAKI_CTRL_OUT_NONE;
+  vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_FRONTTOUCH_RIGHT_R1] = VITAKI_CTRL_OUT_NONE;
 
 	// init controller states
 	chiaki_controller_state_set_idle(&context.stream.controller_state);
