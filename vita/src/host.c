@@ -138,7 +138,6 @@ static void set_ctrl_out(VitaChiakiStream *stream, VitakiCtrlOut ctrl_out) {
 void set_ctrl_l2pos(VitaChiakiStream *stream, VitakiCtrlIn ctrl_in) {
   // check if ctrl_in should be l2; if not, hit corresponding mapped button
   VitakiCtrlMapInfo vcmi = stream->vcmi;
-  LOGD("VITAKI_CTRL_IN: %d -> %d", ctrl_in, vcmi.in_out_btn[ctrl_in]);
   if (vcmi.in_l2 == ctrl_in) {
     stream->controller_state.l2_state = 0xff;
   } else {
@@ -164,7 +163,7 @@ static void *input_thread_func(void* user) {
 
   VitakiCtrlMapInfo vcmi = stream->vcmi;
 
-  if (!vcmi.did_init) init_controller_map(vcmi);
+  if (!vcmi.did_init) init_controller_map(&vcmi);
 
   // Touchscreen setup
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
@@ -179,8 +178,6 @@ static void *input_thread_func(void* user) {
   // note: rear touch may be active in Y only from 108 to 889? (see Vita3K code)
 
   // manually create bools for each combo (since there's only 5)
-  LOGD("RLL: %d, %d, %d", vcmi.in_out_btn[VITAKI_CTRL_IN_REARTOUCH_LEFT_L1], vcmi.in_l2, VITAKI_CTRL_IN_REARTOUCH_LEFT_L1);
-  LOGD("L1: %d, %d", VITAKI_CTRL_IN_L1, vcmi.in_out_btn[VITAKI_CTRL_IN_L1]);
   bool vitaki_reartouch_left_l1_mapped = (vcmi.in_out_btn[VITAKI_CTRL_IN_REARTOUCH_LEFT_L1] != 0) || (vcmi.in_l2 == VITAKI_CTRL_IN_REARTOUCH_LEFT_L1);
   bool vitaki_reartouch_right_r1_mapped = (vcmi.in_out_btn[VITAKI_CTRL_IN_REARTOUCH_RIGHT_R1] != 0) || (vcmi.in_r2 == VITAKI_CTRL_IN_REARTOUCH_RIGHT_R1);
   bool vitaki_select_start_mapped = (vcmi.in_out_btn[VITAKI_CTRL_IN_SELECT_START] != 0);
@@ -279,10 +276,8 @@ static void *input_thread_func(void* user) {
 
       if (ctrl.buttons & SCE_CTRL_L1) {
         if (reartouch_left && vitaki_reartouch_left_l1_mapped) {
-          LOGD("LEFT_L1_MAPPED");
           set_ctrl_l2pos(stream, VITAKI_CTRL_IN_REARTOUCH_LEFT_L1);
         } else {
-          LOGD("NOT LEFT_L1_MAPPED");
           set_ctrl_l2pos(stream, VITAKI_CTRL_IN_L1);
         }
       }
@@ -358,7 +353,7 @@ int host_stream(VitaChiakiHost* host) {
 		LOGE("Error during stream setup: %s", chiaki_error_string(err));
     return 1;
   }
-  init_controller_map(context.stream.vcmi);
+  init_controller_map(&(context.stream.vcmi));
 	context.stream.session_init = true;
 	// audio setting_cb and frame_cb
 	chiaki_opus_decoder_set_cb(&context.stream.opus_decoder, vita_audio_init, vita_audio_cb, NULL);

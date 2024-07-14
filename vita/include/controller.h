@@ -69,4 +69,4 @@ typedef struct vitaki_ctrl_map_info_t {
   bool did_init;
 } VitakiCtrlMapInfo;
 
-void init_controller_map(VitakiCtrlMapInfo vcmi);
+void init_controller_map(VitakiCtrlMapInfo* vcmi);
