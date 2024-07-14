@@ -9,6 +9,7 @@
 #include "discovery.h"
 #include "host.h"
 #include "message_log.h"
+#include "controller.h"
 #include "ui.h"
 // #include "debugnet.h"
 
@@ -40,6 +41,7 @@
 typedef struct vita_chiaki_stream_t {
   ChiakiSession session;
   ChiakiControllerState controller_state;
+  VitakiCtrlMapInfo vcmi;
   bool session_init;
   bool is_streaming;
   int fps;

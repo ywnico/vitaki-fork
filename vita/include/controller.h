@@ -6,8 +6,6 @@
 typedef enum vitaki_ctrl_in_t {
   VITAKI_CTRL_IN_L1 = 0,
   VITAKI_CTRL_IN_R1,
-  VITAKI_CTRL_IN_L3,
-  VITAKI_CTRL_IN_R3,
 
   VITAKI_CTRL_IN_SELECT_START,
   VITAKI_CTRL_IN_LEFT_SQUARE,
@@ -30,8 +28,6 @@ typedef enum vitaki_ctrl_in_t {
   VITAKI_CTRL_IN_FRONTTOUCH_LEFT,
   VITAKI_CTRL_IN_FRONTTOUCH_RIGHT,
   VITAKI_CTRL_IN_FRONTTOUCH_ANY,
-  VITAKI_CTRL_IN_FRONTTOUCH_LEFT_L1,
-  VITAKI_CTRL_IN_FRONTTOUCH_RIGHT_R1,
 
   VITAKI_CTRL_IN_COUNT, // final element to count the total number
 } VitakiCtrlIn;
@@ -65,5 +61,12 @@ typedef enum vitaki_ctrl_out_t {
   VITAKI_CTRL_OUT_NONE     = 0,
 } VitakiCtrlOut;
 
-int vitaki_ctrl_in_state[VITAKI_CTRL_IN_COUNT];
-int vitaki_ctrl_in_out_map[VITAKI_CTRL_IN_COUNT];
+typedef struct vitaki_ctrl_map_info_t {
+  bool in_state[VITAKI_CTRL_IN_COUNT];
+  int in_out_btn[VITAKI_CTRL_IN_COUNT];
+  int in_l2;
+  int in_r2;
+  bool did_init;
+} VitakiCtrlMapInfo;
+
+void init_controller_map(VitakiCtrlMapInfo vcmi);
