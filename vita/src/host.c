@@ -226,17 +226,17 @@ static void *input_thread_func(void* user) {
           set_ctrl_r2pos(stream, VITAKI_CTRL_IN_REARTOUCH_RIGHT);
           reartouch_right = true;
           if (y > TOUCH_MAX_HEIGHT_BY_2) {
-            set_ctrl_r2pos(stream, VITAKI_CTRL_IN_REARTOUCH_UR);
-          } else if (y < TOUCH_MAX_HEIGHT_BY_2) {
             set_ctrl_r2pos(stream, VITAKI_CTRL_IN_REARTOUCH_LR);
+          } else {
+            set_ctrl_r2pos(stream, VITAKI_CTRL_IN_REARTOUCH_UR);
           }
         } else if (x < TOUCH_MAX_WIDTH_BY_2) {
           set_ctrl_l2pos(stream, VITAKI_CTRL_IN_REARTOUCH_LEFT);
           reartouch_left = true;
           if (y > TOUCH_MAX_HEIGHT_BY_2) {
-            set_ctrl_l2pos(stream, VITAKI_CTRL_IN_REARTOUCH_UL);
-          } else if (y < TOUCH_MAX_HEIGHT_BY_2) {
             set_ctrl_l2pos(stream, VITAKI_CTRL_IN_REARTOUCH_LL);
+          } else {
+            set_ctrl_l2pos(stream, VITAKI_CTRL_IN_REARTOUCH_UL);
           }
         }
       }
