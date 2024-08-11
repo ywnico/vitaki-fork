@@ -73,11 +73,11 @@ typedef enum ui_main_widget_id_t {
   UI_MAIN_WIDGET_MESSAGES_BTN,
   UI_MAIN_WIDGET_SETTINGS_BTN,
 
-  // FIXME: this is bound to fail REALLY fast if we start adding more inputs in the future
-  UI_MAIN_WIDGET_TEXT_INPUT,
-
-  // needs to bitwise mask with up to 4 items (current max host count), so >=2 bits (may be increased in the future), and 4 is already occupied by TEXT_INPUT
+  // needs to bitwise mask with up to 4 items (current max host count), so >=2 bits (may be increased in the future), and 4 is already occupied by MESSAGES_BTN
   UI_MAIN_WIDGET_HOST_TILE = 1 << 3,
+
+  // FIXME: this is bound to fail REALLY fast if we start adding more inputs in the future
+  UI_MAIN_WIDGET_TEXT_INPUT = 1 << 6,
 } MainWidgetId;
 
 /// Types of actions that can be performed on hosts
@@ -370,7 +370,7 @@ char* text_input(MainWidgetId id, int x, int y, int w, int h, char* label,
   if (label != NULL) vita2d_font_draw_text(font, x, y + h / 1.5, COLOR_WHITE, 40, label);
   if (value != NULL) vita2d_font_draw_text(font, x + 300, y + h / 1.5, COLOR_WHITE, 40, value);
   
-  if (showingIME) {
+  if (is_active && showingIME) {
     if (sceImeDialogGetStatus() == SCE_COMMON_DIALOG_STATUS_FINISHED) {
       showingIME = false;
       SceImeDialogResult result={};
@@ -537,17 +537,36 @@ UIScreenType draw_main_menu() {
   return next_screen;
 }
 char* PSNID_LABEL = "PSN ID";
+char* CONTROLLER_MAP_ID_LABEL = "Controller map";
 /// Draw the settings form
 /// @return whether the dialog should keep rendering
 bool draw_settings() {
-  char* text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 0, 30, 30, 600, 80, PSNID_LABEL, context.config.psn_account_id, 20);
-  if (text != NULL) {
-    // LOGD("text is %s", text);
+  char* psntext = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 1, 30, 30, 600, 80, PSNID_LABEL, context.config.psn_account_id, 20);
+  if (psntext != NULL) {
+    // LOGD("psntext is %s", psntext);
     free(context.config.psn_account_id);
-    context.config.psn_account_id = text;
+    context.config.psn_account_id = psntext;
     load_psn_id_if_needed();
     config_serialize(&context.config);
   }
+
+  char ctrlmap_text_init[100];
+  snprintf(ctrlmap_text_init, 100, "%d", context.config.controller_map_id);
+  char* ctrlmap_text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 2, 30, 140, 600, 80, CONTROLLER_MAP_ID_LABEL, ctrlmap_text_init, 20);
+  if (ctrlmap_text != NULL) {
+    // LOGD("ctrlmap_text is %s", ctrlmap_text);
+    int ctrlmap_int = strtoimax(ctrlmap_text, NULL, 10);
+    context.config.controller_map_id = ctrlmap_int;
+    config_serialize(&context.config);
+  }
+
+  if (btn_pressed(SCE_CTRL_DOWN)) {
+    context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 2);
+  }
+  if (btn_pressed(SCE_CTRL_UP)) {
+    context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 1);
+  }
+
   if (btn_pressed(SCE_CTRL_CIRCLE)) {
     context.ui_state.next_active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
     // free(context.config.psn_account_id);
@@ -563,7 +582,7 @@ char* LINK_CODE_LABEL = "Registration code";
 /// Draw the form to register a host
 /// @return whether the dialog should keep rendering
 bool draw_registration_dialog() { 
-  char* text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 1, 30, 30, 600, 80, LINK_CODE_LABEL, LINK_CODE, 8);
+  char* text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 0, 30, 30, 600, 80, LINK_CODE_LABEL, LINK_CODE, 8);
   if (text != NULL) {
     if (LINK_CODE != NULL) free(LINK_CODE);
     LINK_CODE = text;
@@ -774,7 +793,7 @@ void draw_ui() {
         if (screen == UI_SCREEN_TYPE_MAIN) {
           screen = draw_main_menu();
         } else if (screen == UI_SCREEN_TYPE_REGISTER_HOST) {
-          context.ui_state.next_active_item = UI_MAIN_WIDGET_TEXT_INPUT | 1;
+          context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 0);
           if (!draw_registration_dialog()) {
             screen = UI_SCREEN_TYPE_MAIN;
           }
@@ -795,7 +814,12 @@ void draw_ui() {
             screen = UI_SCREEN_TYPE_MAIN;
           }
         } else if (screen == UI_SCREEN_TYPE_SETTINGS) {
-          context.ui_state.next_active_item = UI_MAIN_WIDGET_TEXT_INPUT | 0;
+          if (
+              (context.ui_state.next_active_item != (UI_MAIN_WIDGET_TEXT_INPUT | 2))
+              & (context.ui_state.active_item != (UI_MAIN_WIDGET_TEXT_INPUT | 2))
+              ){
+            context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 1);
+          }
           if (!draw_settings()) {
             screen = UI_SCREEN_TYPE_MAIN;
           }
