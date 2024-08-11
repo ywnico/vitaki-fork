@@ -347,7 +347,7 @@ char* text_input(MainWidgetId id, int x, int y, int w, int h, char* label,
       sceImeDialogParamInit(&param);
 			param.supportedLanguages = SCE_IME_LANGUAGE_ENGLISH;
 			param.languagesForced = SCE_TRUE;
-			param.type = SCE_IME_DIALOG_TEXTBOX_MODE_DEFAULT;
+			param.type = SCE_IME_TYPE_DEFAULT;
 			param.option = SCE_IME_OPTION_NO_ASSISTANCE;
 			param.textBoxMode = SCE_IME_DIALOG_TEXTBOX_MODE_DEFAULT;
       uint16_t IMELabel[label != NULL ? sizeof(label) + 1 : sizeof("Text")];
@@ -394,8 +394,59 @@ char* text_input(MainWidgetId id, int x, int y, int w, int h, char* label,
   // TODO: If touched or X pressed, open up IME dialogue and update value
 }
 
-int number_input(int x, int y, int w, int h, char* label,
-                 vita2d_texture* icon) {
+int number_input(MainWidgetId id, int x, int y, int w, int h, char* label, int value) {
+
+  // int to str
+  char value_str[100];
+  snprintf(value_str, 100, "%d", value);
+
+  bool is_active = context.ui_state.active_item == id;
+  if (is_active) {
+    vita2d_draw_rectangle(x + 300 - 3, y - 3, w + 6, h + 6, COLOR_ACTIVE);
+    if (btn_pressed(SCE_CTRL_CROSS)) {
+      SceImeDialogParam param;
+
+      sceImeDialogParamInit(&param);
+			param.supportedLanguages = SCE_IME_LANGUAGE_ENGLISH;
+			param.languagesForced = SCE_TRUE;
+			param.type = SCE_IME_TYPE_NUMBER;
+			param.option = SCE_IME_OPTION_NO_ASSISTANCE;
+			param.textBoxMode = SCE_IME_DIALOG_TEXTBOX_MODE_DEFAULT;
+      uint16_t IMELabel[label != NULL ? sizeof(label) + 1 : sizeof("Text")];
+      utf8_to_utf16(label != NULL ? label : "Text", IMELabel);
+			param.title = IMELabel;
+			param.maxTextLength = SCE_IME_DIALOG_MAX_TEXT_LENGTH;
+      uint16_t IMEValue[sizeof(value_str)];
+      utf8_to_utf16(value_str, IMEValue);
+      param.initialText = IMEValue;
+			param.inputTextBuffer = IMEInput;
+
+      showingIME = true;
+      sceImeDialogInit(&param);
+    }
+  }
+  vita2d_draw_rectangle(x + 300, y, w, h, COLOR_BLACK);
+  // vita2d_draw_texture(icon, x + 20, y + h / 2);
+  if (label != NULL) vita2d_font_draw_text(font, x, y + h / 1.5, COLOR_WHITE, 40, label);
+  vita2d_font_draw_text(font, x + 300, y + h / 1.5, COLOR_WHITE, 40, value_str);
+
+  if (is_active && showingIME) {
+    if (sceImeDialogGetStatus() == SCE_COMMON_DIALOG_STATUS_FINISHED) {
+      showingIME = false;
+      SceImeDialogResult result={};
+      sceImeDialogGetResult(&result);
+      sceImeDialogTerm();
+      if (result.button == SCE_IME_DIALOG_BUTTON_ENTER) {
+
+        uint16_t*last_input = (result.button == SCE_IME_DIALOG_BUTTON_ENTER) ? IMEInput:u"";
+        char IMEResult[SCE_IME_DIALOG_MAX_TEXT_LENGTH + 1];
+        utf16_to_utf8(IMEInput, IMEResult);
+        LOGD("IME returned %s", IMEResult);
+        return strtoimax(strdup(IMEResult), NULL, 10);
+      }
+    }
+  }
+
   // TODO: Render label + icon
   // TODO: Render input border
   // TODO: Render value
@@ -550,13 +601,10 @@ bool draw_settings() {
     config_serialize(&context.config);
   }
 
-  char ctrlmap_text_init[100];
-  snprintf(ctrlmap_text_init, 100, "%d", context.config.controller_map_id);
-  char* ctrlmap_text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 2, 30, 140, 600, 80, CONTROLLER_MAP_ID_LABEL, ctrlmap_text_init, 20);
-  if (ctrlmap_text != NULL) {
-    // LOGD("ctrlmap_text is %s", ctrlmap_text);
-    int ctrlmap_int = strtoimax(ctrlmap_text, NULL, 10);
-    context.config.controller_map_id = ctrlmap_int;
+  int ctrlmap_id = number_input(UI_MAIN_WIDGET_TEXT_INPUT | 2, 30, 140, 600, 80, CONTROLLER_MAP_ID_LABEL, context.config.controller_map_id);
+  if (ctrlmap_id != -1) {
+    // LOGD("ctrlmap_id is %d", ctrlmap_id);
+    context.config.controller_map_id = ctrlmap_id;
     config_serialize(&context.config);
   }
 
@@ -814,10 +862,7 @@ void draw_ui() {
             screen = UI_SCREEN_TYPE_MAIN;
           }
         } else if (screen == UI_SCREEN_TYPE_SETTINGS) {
-          if (
-              (context.ui_state.next_active_item != (UI_MAIN_WIDGET_TEXT_INPUT | 2))
-              & (context.ui_state.active_item != (UI_MAIN_WIDGET_TEXT_INPUT | 2))
-              ){
+          if (context.ui_state.active_item != (UI_MAIN_WIDGET_TEXT_INPUT | 2)) {
             context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 1);
           }
           if (!draw_settings()) {
