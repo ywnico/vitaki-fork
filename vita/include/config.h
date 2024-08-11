@@ -30,6 +30,8 @@ typedef struct vita_chiaki_config_t {
   VitaChiakiHost* registered_hosts[MAX_NUM_HOSTS];
   // TODO: Logfile path
   // TODO: Loglevel
+  // controller map id // TODO should probably replace with fully customizable map
+  int controller_map_id;
 } VitaChiakiConfig;
 
 void config_parse(VitaChiakiConfig* cfg);

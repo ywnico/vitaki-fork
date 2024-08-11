@@ -2,9 +2,26 @@
 #include <chiaki/common.h>
 #include <chiaki/controller.h>
 
+// TODO controls should be made fully customizable in the future.
+// For now, use a set of defined maps
+typedef enum vitaki_controller_map_id_t {
+  VITAKI_CONTROLLER_MAP_0      =  0, // L2, R2 rear touchscreen upper corners; L3, R3 rear touchscreen lower corners; touchpad entire front
+  VITAKI_CONTROLLER_MAP_1      =  1, // L2, R2 front touchscreen upper corners; L3, R3 front touchscreen lower corners; touchpad front middle
+  VITAKI_CONTROLLER_MAP_2      =  2, // L2, R2 front touchscreen lower corners; L3 R3 on back; touchpad front middle
+  VITAKI_CONTROLLER_MAP_3      =  3, // L2, R2 front touchscreen upper corners; L3 R3 on back; touchpad front middle
+  VITAKI_CONTROLLER_MAP_4      =  4, // no L2,R2,L3,R3 mapping; touchpad entire front
+  VITAKI_CONTROLLER_MAP_5      =  5, // no L2,R2,L3,R3,touchpad mapping
+  VITAKI_CONTROLLER_MAP_6      =  6, // L2, R2 front touchscreen lower corners; no L3 R3; touchpad front middle
+  VITAKI_CONTROLLER_MAP_7      =  7, // L2, R2 front touchscreen upper corners; no L3 R3; touchpad front middle
+  VITAKI_CONTROLLER_MAP_25     = 25, // L2, R2 front touchscreen upper corners; L3, R3 front touchscreen lower corners; no touchpad
+  VITAKI_CONTROLLER_MAP_YWNICO = 99, // map ywnico randomly came up with
+} VitakiControllerMapId;
+
 // Control buttons (used for array indices => start at 0)
 typedef enum vitaki_ctrl_in_t {
-  VITAKI_CTRL_IN_L1 = 0,
+  VITAKI_CTRL_IN_NONE = 0,
+
+  VITAKI_CTRL_IN_L1,
   VITAKI_CTRL_IN_R1,
 
   VITAKI_CTRL_IN_SELECT_START,
@@ -21,12 +38,13 @@ typedef enum vitaki_ctrl_in_t {
   VITAKI_CTRL_IN_REARTOUCH_LEFT_L1,
   VITAKI_CTRL_IN_REARTOUCH_RIGHT_R1,
 
-  VITAKI_CTRL_IN_FRONTTOUCH_UL,
-  VITAKI_CTRL_IN_FRONTTOUCH_UR,
-  VITAKI_CTRL_IN_FRONTTOUCH_LL,
-  VITAKI_CTRL_IN_FRONTTOUCH_LR,
+  VITAKI_CTRL_IN_FRONTTOUCH_UL_ARC,
+  VITAKI_CTRL_IN_FRONTTOUCH_UR_ARC,
+  VITAKI_CTRL_IN_FRONTTOUCH_LL_ARC,
+  VITAKI_CTRL_IN_FRONTTOUCH_LR_ARC,
   VITAKI_CTRL_IN_FRONTTOUCH_LEFT,
   VITAKI_CTRL_IN_FRONTTOUCH_RIGHT,
+  VITAKI_CTRL_IN_FRONTTOUCH_CENTER,
   VITAKI_CTRL_IN_FRONTTOUCH_ANY,
 
   VITAKI_CTRL_IN_COUNT, // final element to count the total number
@@ -69,4 +87,4 @@ typedef struct vitaki_ctrl_map_info_t {
   bool did_init;
 } VitakiCtrlMapInfo;
 
-void init_controller_map(VitakiCtrlMapInfo* vcmi);
+void init_controller_map(VitakiCtrlMapInfo* vcmi, VitakiControllerMapId controller_map_id);

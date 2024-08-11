@@ -163,7 +163,7 @@ static void *input_thread_func(void* user) {
 
   VitakiCtrlMapInfo vcmi = stream->vcmi;
 
-  if (!vcmi.did_init) init_controller_map(&vcmi);
+  if (!vcmi.did_init) init_controller_map(&vcmi, context.config.controller_map_id);
 
   // Touchscreen setup
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
@@ -175,6 +175,10 @@ static void *input_thread_func(void* user) {
   int TOUCH_MAX_HEIGHT = 1087;
   int TOUCH_MAX_WIDTH_BY_2 = TOUCH_MAX_WIDTH/2;
   int TOUCH_MAX_HEIGHT_BY_2 = TOUCH_MAX_HEIGHT/2;
+  int TOUCH_MAX_WIDTH_BY_4 = TOUCH_MAX_WIDTH/4;
+  int TOUCH_MAX_HEIGHT_BY_4 = TOUCH_MAX_HEIGHT/4;
+  int FRONT_ARC_RADIUS = TOUCH_MAX_HEIGHT/3;
+  int FRONT_ARC_RADIUS_2 = FRONT_ARC_RADIUS*FRONT_ARC_RADIUS;
   // note: rear touch may be active in Y only from 108 to 889? (see Vita3K code)
 
   // manually create bools for each combo (since there's only 5)
@@ -244,18 +248,26 @@ static void *input_thread_func(void* user) {
 
         if (x > TOUCH_MAX_WIDTH_BY_2) {
           set_ctrl_r2pos(stream, VITAKI_CTRL_IN_FRONTTOUCH_RIGHT);
-          if (y > TOUCH_MAX_HEIGHT_BY_2) {
-            set_ctrl_r2pos(stream, VITAKI_CTRL_IN_FRONTTOUCH_UR);
-          } else if (y < TOUCH_MAX_HEIGHT_BY_2) {
-            set_ctrl_r2pos(stream, VITAKI_CTRL_IN_FRONTTOUCH_LR);
+
+          if (y*y + (x-TOUCH_MAX_WIDTH)*(x-TOUCH_MAX_WIDTH) <= FRONT_ARC_RADIUS_2) {
+            set_ctrl_r2pos(stream, VITAKI_CTRL_IN_FRONTTOUCH_UR_ARC);
+          } else if ((y-TOUCH_MAX_HEIGHT)*(y-TOUCH_MAX_HEIGHT) + (x-TOUCH_MAX_WIDTH)*(x-TOUCH_MAX_WIDTH) <= FRONT_ARC_RADIUS_2) {
+            set_ctrl_r2pos(stream, VITAKI_CTRL_IN_FRONTTOUCH_LR_ARC);
           }
         } else if (x < TOUCH_MAX_WIDTH_BY_2) {
           set_ctrl_l2pos(stream, VITAKI_CTRL_IN_FRONTTOUCH_LEFT);
-          if (y > TOUCH_MAX_HEIGHT_BY_2) {
-            set_ctrl_l2pos(stream, VITAKI_CTRL_IN_FRONTTOUCH_UL);
-          } else if (y < TOUCH_MAX_HEIGHT_BY_2) {
-            set_ctrl_l2pos(stream, VITAKI_CTRL_IN_FRONTTOUCH_LL);
+
+          if (y*y + x*x <= FRONT_ARC_RADIUS_2) {
+            set_ctrl_l2pos(stream, VITAKI_CTRL_IN_FRONTTOUCH_UL_ARC);
+          } else if ((y-TOUCH_MAX_HEIGHT)*(y-TOUCH_MAX_HEIGHT) + x*x <= FRONT_ARC_RADIUS_2) {
+            set_ctrl_l2pos(stream, VITAKI_CTRL_IN_FRONTTOUCH_LL_ARC);
           }
+        }
+
+        if ((x >= TOUCH_MAX_WIDTH_BY_4) && (x <= TOUCH_MAX_WIDTH - TOUCH_MAX_WIDTH_BY_4)
+            && (y >= TOUCH_MAX_HEIGHT_BY_4) && (y <= TOUCH_MAX_HEIGHT - TOUCH_MAX_HEIGHT_BY_4)
+            ) {
+          stream->controller_state.buttons |= vcmi.in_out_btn[VITAKI_CTRL_IN_FRONTTOUCH_CENTER];
         }
       }
 
@@ -317,6 +329,7 @@ static void *input_thread_func(void* user) {
 
       chiaki_session_set_controller_state(&stream->session, &stream->controller_state);
       // LOGD("ly 0x%x %d", ctrl.ly, ctrl.ly);
+      // TODO adjust sleep tiem to account for calculations above
       usleep(ms_per_loop*1000);
     }
   }
@@ -353,7 +366,7 @@ int host_stream(VitaChiakiHost* host) {
 		LOGE("Error during stream setup: %s", chiaki_error_string(err));
     return 1;
   }
-  init_controller_map(&(context.stream.vcmi));
+  init_controller_map(&(context.stream.vcmi), context.config.controller_map_id);
 	context.stream.session_init = true;
 	// audio setting_cb and frame_cb
 	chiaki_opus_decoder_set_cb(&context.stream.opus_decoder, vita_audio_init, vita_audio_cb, NULL);
