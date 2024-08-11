@@ -195,6 +195,8 @@ static void *input_thread_func(void* user) {
 
 
     if (stream->is_streaming) {
+      int start_time_us = sceKernelGetProcessTimeWide();
+
       // get button state
       sceCtrlPeekBufferPositiveExt2(0, &ctrl, 1);
 
@@ -329,8 +331,17 @@ static void *input_thread_func(void* user) {
 
       chiaki_session_set_controller_state(&stream->session, &stream->controller_state);
       // LOGD("ly 0x%x %d", ctrl.ly, ctrl.ly);
-      // TODO adjust sleep tiem to account for calculations above
-      usleep(ms_per_loop*1000);
+
+      // Adjust sleep time to account for calculations above
+      int diff_time_us = sceKernelGetProcessTimeWide() - start_time_us;
+      if (diff_time_us >= ms_per_loop*1000) {
+        // Control loop appears to usually take ~70-90 us, sometimes up to 130
+        // Far less than the 5000 us of the default loop
+        LOGD("SLOW CTRL LOOP! %d microseconds", diff_time_us);
+      } else {
+        usleep(ms_per_loop*1000 - diff_time_us);
+      }
+
     }
   }
 
