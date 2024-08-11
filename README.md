@@ -2,15 +2,8 @@
 
 This is ywnico's fork of [aa's Vitaki](https://git.catvibers.me/aa/chiaki) with the following updates:
 1. Implemented audio
-2. Added more control mappings. The full set is now:
-    | Map sent to PS4/5 | Vita controls |
-    | -----|----- |
-    | `L2` | `L1` + left side of rear touch sensor |
-    | `R2` | `R1` + right side of rear touch sensor |
-    | Touchpad (trapezoid button) | front touch screen |
-    | Left analog stick button | `D-pad left` + `Square` |
-    | Right analog stick button | `D-pad right` + `Circle` |
-    | PS (home) button | `Select` + `Start` |
+2. Added control mappings for L2, R2, L3, R3, and touchpad (trapezoid button), following the official ps4 remote play maps in `vs0:app/NPXS10013/keymap/`
+    - Note: `Select` + `Start` sends the PS (home) button
 3. Fixed instant deconnection bug
 4. Disabled `vblank_wait` and set fps to 30 to reduce lag.
     - NOTE: the fps in the config file (`chiaki.toml`) will be ignored

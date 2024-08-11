@@ -647,6 +647,9 @@ bool draw_settings() {
   vita2d_font_draw_text(font, info_x, info_y + 10*info_y_delta, COLOR_WHITE, font_size,
                         "99: L2, R2 = L1 + rear, R1 + rear; L3 = Left+Square, R3 = Right+Circle; touchpad entire front"
                         );
+  vita2d_font_draw_text(font, info_x, info_y + 12*info_y_delta, COLOR_WHITE, font_size,
+                        "In all maps, press Start + Select simultaneously for PS (home) button"
+                        );
 
   if (btn_pressed(SCE_CTRL_DOWN)) {
     context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 2);
