@@ -608,6 +608,46 @@ bool draw_settings() {
     config_serialize(&context.config);
   }
 
+  // Draw controller text notes
+  int font_size = 18;
+  int info_x = 30;
+  int info_y = 250;
+  int info_y_delta = 21;
+
+  vita2d_font_draw_text(font, info_x, info_y, COLOR_WHITE, font_size,
+                        "Controller map values: 0,1,2,3,4,5,6,7,25: official remote play maps (see vs0:app/NPXS10013/keymap/)"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 1*info_y_delta, COLOR_WHITE, font_size,
+                        "0: L2, R2 rear upper quarters; L3, R3 rear lower quarters; touchpad entire front"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 2*info_y_delta, COLOR_WHITE, font_size,
+                        "1: L2, R2 front upper corners; L3, R3 front lower corners; touchpad front center"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 3*info_y_delta, COLOR_WHITE, font_size,
+                        "2: L2, R2 front lower corners; L3, R3 rear left/right half; touchpad front center"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 4*info_y_delta, COLOR_WHITE, font_size,
+                        "3: L2, R2 front upper corners; L3, R3 rear left/right half; touchpad front center"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 5*info_y_delta, COLOR_WHITE, font_size,
+                        "4: No L2, R2, L3, R3; touchpad entire front"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 6*info_y_delta, COLOR_WHITE, font_size,
+                        "5: No L2, R2, L3, R3, or touchpad"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 7*info_y_delta, COLOR_WHITE, font_size,
+                        "6: L2, R2 front lower corners; no L3, R3; touchpad front center"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 8*info_y_delta, COLOR_WHITE, font_size,
+                        "7: L2, R2 front upper corners; no L3, R3; touchpad front center"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 9*info_y_delta, COLOR_WHITE, font_size,
+                        "25: L2, R2 front upper corners; L3, R3 front lower corners; no touchpad"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 10*info_y_delta, COLOR_WHITE, font_size,
+                        "99: L2, R2 = L1 + rear, R1 + rear; L3 = Left+Square, R3 = Right+Circle; touchpad entire front"
+                        );
+
   if (btn_pressed(SCE_CTRL_DOWN)) {
     context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 2);
   }
