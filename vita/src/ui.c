@@ -73,11 +73,11 @@ typedef enum ui_main_widget_id_t {
   UI_MAIN_WIDGET_MESSAGES_BTN,
   UI_MAIN_WIDGET_SETTINGS_BTN,
 
-  // FIXME: this is bound to fail REALLY fast if we start adding more inputs in the future
-  UI_MAIN_WIDGET_TEXT_INPUT,
-
-  // needs to bitwise mask with up to 4 items (current max host count), so >=2 bits (may be increased in the future), and 4 is already occupied by TEXT_INPUT
+  // needs to bitwise mask with up to 4 items (current max host count), so >=2 bits (may be increased in the future), and 4 is already occupied by MESSAGES_BTN
   UI_MAIN_WIDGET_HOST_TILE = 1 << 3,
+
+  // FIXME: this is bound to fail REALLY fast if we start adding more inputs in the future
+  UI_MAIN_WIDGET_TEXT_INPUT = 1 << 6,
 } MainWidgetId;
 
 /// Types of actions that can be performed on hosts
@@ -347,7 +347,7 @@ char* text_input(MainWidgetId id, int x, int y, int w, int h, char* label,
       sceImeDialogParamInit(&param);
 			param.supportedLanguages = SCE_IME_LANGUAGE_ENGLISH;
 			param.languagesForced = SCE_TRUE;
-			param.type = SCE_IME_DIALOG_TEXTBOX_MODE_DEFAULT;
+			param.type = SCE_IME_TYPE_DEFAULT;
 			param.option = SCE_IME_OPTION_NO_ASSISTANCE;
 			param.textBoxMode = SCE_IME_DIALOG_TEXTBOX_MODE_DEFAULT;
       uint16_t IMELabel[label != NULL ? sizeof(label) + 1 : sizeof("Text")];
@@ -370,7 +370,7 @@ char* text_input(MainWidgetId id, int x, int y, int w, int h, char* label,
   if (label != NULL) vita2d_font_draw_text(font, x, y + h / 1.5, COLOR_WHITE, 40, label);
   if (value != NULL) vita2d_font_draw_text(font, x + 300, y + h / 1.5, COLOR_WHITE, 40, value);
   
-  if (showingIME) {
+  if (is_active && showingIME) {
     if (sceImeDialogGetStatus() == SCE_COMMON_DIALOG_STATUS_FINISHED) {
       showingIME = false;
       SceImeDialogResult result={};
@@ -394,8 +394,59 @@ char* text_input(MainWidgetId id, int x, int y, int w, int h, char* label,
   // TODO: If touched or X pressed, open up IME dialogue and update value
 }
 
-int number_input(int x, int y, int w, int h, char* label,
-                 vita2d_texture* icon) {
+int number_input(MainWidgetId id, int x, int y, int w, int h, char* label, int value) {
+
+  // int to str
+  char value_str[100];
+  snprintf(value_str, 100, "%d", value);
+
+  bool is_active = context.ui_state.active_item == id;
+  if (is_active) {
+    vita2d_draw_rectangle(x + 300 - 3, y - 3, w + 6, h + 6, COLOR_ACTIVE);
+    if (btn_pressed(SCE_CTRL_CROSS)) {
+      SceImeDialogParam param;
+
+      sceImeDialogParamInit(&param);
+			param.supportedLanguages = SCE_IME_LANGUAGE_ENGLISH;
+			param.languagesForced = SCE_TRUE;
+			param.type = SCE_IME_TYPE_NUMBER;
+			param.option = SCE_IME_OPTION_NO_ASSISTANCE;
+			param.textBoxMode = SCE_IME_DIALOG_TEXTBOX_MODE_DEFAULT;
+      uint16_t IMELabel[label != NULL ? sizeof(label) + 1 : sizeof("Text")];
+      utf8_to_utf16(label != NULL ? label : "Text", IMELabel);
+			param.title = IMELabel;
+			param.maxTextLength = SCE_IME_DIALOG_MAX_TEXT_LENGTH;
+      uint16_t IMEValue[sizeof(value_str)];
+      utf8_to_utf16(value_str, IMEValue);
+      param.initialText = IMEValue;
+			param.inputTextBuffer = IMEInput;
+
+      showingIME = true;
+      sceImeDialogInit(&param);
+    }
+  }
+  vita2d_draw_rectangle(x + 300, y, w, h, COLOR_BLACK);
+  // vita2d_draw_texture(icon, x + 20, y + h / 2);
+  if (label != NULL) vita2d_font_draw_text(font, x, y + h / 1.5, COLOR_WHITE, 40, label);
+  vita2d_font_draw_text(font, x + 300, y + h / 1.5, COLOR_WHITE, 40, value_str);
+
+  if (is_active && showingIME) {
+    if (sceImeDialogGetStatus() == SCE_COMMON_DIALOG_STATUS_FINISHED) {
+      showingIME = false;
+      SceImeDialogResult result={};
+      sceImeDialogGetResult(&result);
+      sceImeDialogTerm();
+      if (result.button == SCE_IME_DIALOG_BUTTON_ENTER) {
+
+        uint16_t*last_input = (result.button == SCE_IME_DIALOG_BUTTON_ENTER) ? IMEInput:u"";
+        char IMEResult[SCE_IME_DIALOG_MAX_TEXT_LENGTH + 1];
+        utf16_to_utf8(IMEInput, IMEResult);
+        LOGD("IME returned %s", IMEResult);
+        return strtoimax(strdup(IMEResult), NULL, 10);
+      }
+    }
+  }
+
   // TODO: Render label + icon
   // TODO: Render input border
   // TODO: Render value
@@ -537,17 +588,76 @@ UIScreenType draw_main_menu() {
   return next_screen;
 }
 char* PSNID_LABEL = "PSN ID";
+char* CONTROLLER_MAP_ID_LABEL = "Controller map";
 /// Draw the settings form
 /// @return whether the dialog should keep rendering
 bool draw_settings() {
-  char* text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 0, 30, 30, 600, 80, PSNID_LABEL, context.config.psn_account_id, 20);
-  if (text != NULL) {
-    // LOGD("text is %s", text);
+  char* psntext = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 1, 30, 30, 600, 80, PSNID_LABEL, context.config.psn_account_id, 20);
+  if (psntext != NULL) {
+    // LOGD("psntext is %s", psntext);
     free(context.config.psn_account_id);
-    context.config.psn_account_id = text;
+    context.config.psn_account_id = psntext;
     load_psn_id_if_needed();
     config_serialize(&context.config);
   }
+
+  int ctrlmap_id = number_input(UI_MAIN_WIDGET_TEXT_INPUT | 2, 30, 140, 600, 80, CONTROLLER_MAP_ID_LABEL, context.config.controller_map_id);
+  if (ctrlmap_id != -1) {
+    // LOGD("ctrlmap_id is %d", ctrlmap_id);
+    context.config.controller_map_id = ctrlmap_id;
+    config_serialize(&context.config);
+  }
+
+  // Draw controller text notes
+  int font_size = 18;
+  int info_x = 30;
+  int info_y = 250;
+  int info_y_delta = 21;
+
+  vita2d_font_draw_text(font, info_x, info_y, COLOR_WHITE, font_size,
+                        "Controller map values: 0,1,2,3,4,5,6,7,25: official remote play maps (see vs0:app/NPXS10013/keymap/)"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 1*info_y_delta, COLOR_WHITE, font_size,
+                        "0: L2, R2 rear upper quarters; L3, R3 rear lower quarters; touchpad entire front"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 2*info_y_delta, COLOR_WHITE, font_size,
+                        "1: L2, R2 front upper corners; L3, R3 front lower corners; touchpad front center"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 3*info_y_delta, COLOR_WHITE, font_size,
+                        "2: L2, R2 front lower corners; L3, R3 rear left/right half; touchpad front center"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 4*info_y_delta, COLOR_WHITE, font_size,
+                        "3: L2, R2 front upper corners; L3, R3 rear left/right half; touchpad front center"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 5*info_y_delta, COLOR_WHITE, font_size,
+                        "4: No L2, R2, L3, R3; touchpad entire front"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 6*info_y_delta, COLOR_WHITE, font_size,
+                        "5: No L2, R2, L3, R3, or touchpad"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 7*info_y_delta, COLOR_WHITE, font_size,
+                        "6: L2, R2 front lower corners; no L3, R3; touchpad front center"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 8*info_y_delta, COLOR_WHITE, font_size,
+                        "7: L2, R2 front upper corners; no L3, R3; touchpad front center"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 9*info_y_delta, COLOR_WHITE, font_size,
+                        "25: L2, R2 front upper corners; L3, R3 front lower corners; no touchpad"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 10*info_y_delta, COLOR_WHITE, font_size,
+                        "99: L2, R2 = L1 + rear, R1 + rear; L3 = Left+Square, R3 = Right+Circle; touchpad entire front"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + 12*info_y_delta, COLOR_WHITE, font_size,
+                        "In all maps, press Start + Select simultaneously for PS (home) button"
+                        );
+
+  if (btn_pressed(SCE_CTRL_DOWN)) {
+    context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 2);
+  }
+  if (btn_pressed(SCE_CTRL_UP)) {
+    context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 1);
+  }
+
   if (btn_pressed(SCE_CTRL_CIRCLE)) {
     context.ui_state.next_active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
     // free(context.config.psn_account_id);
@@ -563,7 +673,7 @@ char* LINK_CODE_LABEL = "Registration code";
 /// Draw the form to register a host
 /// @return whether the dialog should keep rendering
 bool draw_registration_dialog() { 
-  char* text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 1, 30, 30, 600, 80, LINK_CODE_LABEL, LINK_CODE, 8);
+  char* text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 0, 30, 30, 600, 80, LINK_CODE_LABEL, LINK_CODE, 8);
   if (text != NULL) {
     if (LINK_CODE != NULL) free(LINK_CODE);
     LINK_CODE = text;
@@ -774,7 +884,7 @@ void draw_ui() {
         if (screen == UI_SCREEN_TYPE_MAIN) {
           screen = draw_main_menu();
         } else if (screen == UI_SCREEN_TYPE_REGISTER_HOST) {
-          context.ui_state.next_active_item = UI_MAIN_WIDGET_TEXT_INPUT | 1;
+          context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 0);
           if (!draw_registration_dialog()) {
             screen = UI_SCREEN_TYPE_MAIN;
           }
@@ -795,7 +905,9 @@ void draw_ui() {
             screen = UI_SCREEN_TYPE_MAIN;
           }
         } else if (screen == UI_SCREEN_TYPE_SETTINGS) {
-          context.ui_state.next_active_item = UI_MAIN_WIDGET_TEXT_INPUT | 0;
+          if (context.ui_state.active_item != (UI_MAIN_WIDGET_TEXT_INPUT | 2)) {
+            context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 1);
+          }
           if (!draw_settings()) {
             screen = UI_SCREEN_TYPE_MAIN;
           }

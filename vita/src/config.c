@@ -61,6 +61,7 @@ void config_parse(VitaChiakiConfig* cfg) {
   cfg->disconnect_action = DISCONNECT_ACTION_ASK;
   cfg->resolution = CHIAKI_VIDEO_RESOLUTION_PRESET_540p;
   cfg->fps = CHIAKI_VIDEO_FPS_PRESET_30;
+  cfg->controller_map_id = 0;
   if (access(CFG_FILENAME, F_OK) == 0) {
     FILE* fp = fopen(CFG_FILENAME, "r");
     char errbuf[200];
@@ -100,8 +101,8 @@ void config_parse(VitaChiakiConfig* cfg) {
       } else {
         cfg->resolution = CHIAKI_VIDEO_RESOLUTION_PRESET_540p;
       }
-      datum = toml_int_in(settings, "fps");
 
+      datum = toml_int_in(settings, "fps");
       // set fps to 30 regardless of config file
       cfg->fps = CHIAKI_VIDEO_FPS_PRESET_30;
       if (datum.ok) {
@@ -112,7 +113,13 @@ void config_parse(VitaChiakiConfig* cfg) {
       if (datum.ok) {
         cfg->psn_account_id = datum.u.s;
       }
+
+      datum = toml_int_in(settings, "controller_map_id");
+      if (datum.ok) {
+        cfg->controller_map_id = datum.u.i;
+      }
     }
+
     toml_array_t* regist_hosts = toml_array_in(parsed, "registered_hosts");
     if (regist_hosts && toml_array_kind(regist_hosts) == 't') {
       int num_rhosts = toml_array_nelem(regist_hosts);
@@ -332,6 +339,7 @@ void config_serialize(VitaChiakiConfig* cfg) {
   if (cfg->psn_account_id) {
     fprintf(fp, "psn_account_id = \"%s\"\n", cfg->psn_account_id);
   }
+  fprintf(fp, "controller_map_id = %d\n", cfg->controller_map_id);
 
   for (int i = 0; i < cfg->num_manual_hosts; i++) {
     VitaChiakiHost* host = cfg->manual_hosts[i];
