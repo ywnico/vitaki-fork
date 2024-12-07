@@ -395,10 +395,15 @@ char* text_input(MainWidgetId id, int x, int y, int w, int h, char* label,
 }
 
 int number_input(MainWidgetId id, int x, int y, int w, int h, char* label, int value) {
+  // -1 => blank
 
   // int to str
   char value_str[100];
-  snprintf(value_str, 100, "%d", value);
+  if (value == -1) {
+    value_str[0] = 0; // empty string
+  } else {
+    snprintf(value_str, 100, "%d", value);
+  }
 
   bool is_active = context.ui_state.active_item == id;
   if (is_active) {
@@ -559,7 +564,7 @@ UIScreenType draw_main_menu() {
 
   switch (context.ui_state.active_item) {
   case UI_MAIN_WIDGET_ADD_HOST_BTN:
-    tooltip_msg = "Manually add host (functionality currently disabled; wait for discovery instead)";
+    tooltip_msg = "Manually add remote host";
     break;
   case UI_MAIN_WIDGET_REGISTER_BTN:
     tooltip_msg = "Manually register (functionality currently disabled)";
@@ -692,12 +697,97 @@ bool draw_registration_dialog() {
   }
   return true;
 }
+
+char* REMOTEIP_LABEL = "Remote IP";
+char* REGISTERED_CONSOLE_LABEL = "Console No.";
+char* REMOTEIP;
+int CONSOLENUM = -1;
+
 /// Draw the form to manually add a new host
 /// @return whether the dialog should keep rendering
 bool draw_add_host_dialog() { 
+  char* remoteip_text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 1, 30, 30, 600, 80, REMOTEIP_LABEL, REMOTEIP, 20);
+  if (remoteip_text != NULL) {
+    //if (REMOTEIP != NULL) free(REMOTEIP);
+    REMOTEIP = remoteip_text;
+    // LOGD("remoteip_text is %s", remoteip_text);
+    //free(context.config.psn_account_id);
+    //context.config.psn_account_id = remoteip_text;
+    //load_psn_id_if_needed();
+    //config_serialize(&context.config);
+  }
+
+  int console_num = number_input(UI_MAIN_WIDGET_TEXT_INPUT | 2, 30, 140, 600, 80, REGISTERED_CONSOLE_LABEL, CONSOLENUM);
+  if ((console_num >= 0) && (console_num < context.config.num_registered_hosts)) {
+    VitaChiakiHost* rhost = context.config.registered_hosts[console_num];
+    if (rhost) {
+      CONSOLENUM = console_num;
+      // LOGD("console_num is %d", console_num);
+      //context.config.controller_map_id = console_num;
+      //config_serialize(&context.config);
+    }
+  }
+
+  // Draw list of consoles
+  int font_size = 18;
+  int info_x = 30;
+  int info_y = 250;
+  int info_y_delta = 21;
+
+  bool host_exists = false;
+  int j = 0;
+  for (int rhost_idx = 0; rhost_idx < context.config.num_registered_hosts; rhost_idx++) {
+    VitaChiakiHost* rhost = context.config.registered_hosts[rhost_idx];
+    if (!rhost) {
+      continue;
+    }
+
+    // If a host is found then there is at least 1 host, so write instructions line.
+    if (!host_exists) {
+      vita2d_font_draw_text(font, info_x, info_y, COLOR_WHITE, font_size,
+                            "Select number (0, 1, etc) from registered consoles below:"
+                            );
+    }
+    host_exists = true;
 
 
-  return false; 
+    bool is_ps5 = chiaki_target_is_ps5(rhost->target);
+    char this_host_info[100];
+    snprintf(this_host_info, 100, "%d: %s (%s)", rhost_idx, rhost->registered_state->server_nickname, is_ps5 ? "PS5" : "PS4");
+    vita2d_font_draw_text(font, info_x, info_y + 2*(j+1)*info_y_delta, COLOR_WHITE, font_size,
+                          this_host_info
+                          );
+
+    j++;
+  }
+
+  if (!host_exists) {
+    vita2d_font_draw_text(font, info_x, info_y, COLOR_WHITE, font_size,
+                          "No consoles registered! Register a console locally first."
+                          );
+  }
+
+  vita2d_font_draw_text(font, info_x, info_y + 12*info_y_delta, COLOR_WHITE, font_size,
+                        "Circle: save and add host. Triangle: Exit without saving."
+                        );
+
+  if (btn_pressed(SCE_CTRL_DOWN)) {
+    context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 2);
+  }
+  if (btn_pressed(SCE_CTRL_UP)) {
+    context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 1);
+  }
+
+  if (btn_pressed(SCE_CTRL_CIRCLE) | btn_pressed(SCE_CTRL_TRIANGLE)) {
+    if (btn_pressed(SCE_CTRL_CIRCLE)) {
+      // TODO add new host
+    }
+    context.ui_state.next_active_item = UI_MAIN_WIDGET_ADD_HOST_BTN;
+    REMOTEIP = "";
+    CONSOLENUM = -1;
+    return false;
+  }
+  return true;
 }
 
 /// Draw the form to edit an existing host
@@ -889,6 +979,11 @@ void draw_ui() {
             screen = UI_SCREEN_TYPE_MAIN;
           }
         } else if (screen == UI_SCREEN_TYPE_ADD_HOST) {
+          if (context.ui_state.next_active_item != (UI_MAIN_WIDGET_TEXT_INPUT | 2)) {
+            if (context.ui_state.active_item != (UI_MAIN_WIDGET_TEXT_INPUT | 2)) {
+              context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 1);
+            }
+          }
           if (!draw_add_host_dialog()) {
             screen = UI_SCREEN_TYPE_MAIN;
           }
