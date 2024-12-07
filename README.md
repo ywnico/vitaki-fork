@@ -12,7 +12,27 @@ This is ywnico's fork of [aa's Vitaki](https://git.catvibers.me/aa/chiaki) with 
 7. Included [ghost's LiveArea icon fixes](https://git.catvibers.me/aa/chiaki/pulls/13)
 8. Various bug and crash fixes
 
-# Chiaki
+## Instructions
+### Local connection
+1. Connect PS Vita and PS5 (or PS4) to the same local WiFi network.
+2. Log in to the same PSN account on both the PS5 and the Vita.
+3. Open Vitaki on PS Vita.
+4. Check settings (gear icon) to ensure your encoded PSN ID is there (if it's not automatically populated, or you accidentally deleted it, there are a number of websites that will tell you your encoded PSN ID given your account username. Or, you can quit Vitaki, delete the Vitaki settings directory, `ux0:data/vita-chiaki`, and let Vitaki auto-detect it again).
+5. The console should be automatically detected and appear as an icon.
+6. Select the console and Vitaki should ask for a registration code. On the PS5, navigate to `Settings > System > Remote Play` and select `Pair Device`. An 8-digit numeric code should appear; enter this into Vitaki and hit circle.
+7. Select the console again in Vitaki. It should now connect (and in the future, will not ask for the device pairing code).
+
+There are a number of known bugs. Most notably, if there are multiple consoles on the network, connection will fail.
+
+### Remote connection
+UDP holepunching is not supported. Instead, a remote connection requires a static IP and port forwarding.
+
+1. Register your console on your local network following the above instructions.
+2. Follow the "manual remote connection" section in [these instructions](https://streetpea.github.io/chiaki-ng/setup/remoteconnection/#manual-remote-connection) to set up a static IP and port forwarding on your network.
+3. TODO
+
+
+# Chiaki4deck
 
 ## [chiaki4deck](https://streetpea.github.io/chiaki4deck/)
 
