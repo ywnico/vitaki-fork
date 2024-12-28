@@ -196,8 +196,9 @@ void config_parse(VitaChiakiConfig* cfg) {
     toml_array_t* manual_hosts = toml_array_in(parsed, "manual_hosts");
     if (manual_hosts && toml_array_kind(manual_hosts) == 't') {
       int num_mhosts = toml_array_nelem(manual_hosts);
+      LOGD("Found %d manual hosts", num_mhosts);
       for (int i=0; i < MIN(MAX_NUM_HOSTS, num_mhosts) ; i++) {
-        VitaChiakiHost* host;
+        VitaChiakiHost* host = NULL;
         toml_table_t* host_cfg = toml_table_at(manual_hosts, i);
         datum = toml_string_in(host_cfg, "server_mac");
         uint8_t server_mac[6];
@@ -208,8 +209,8 @@ void config_parse(VitaChiakiConfig* cfg) {
           free(datum.u.s);
           for (int hidx=0; hidx < cfg->num_registered_hosts; hidx++) {
             uint8_t* candidate_mac = cfg->registered_hosts[hidx]->server_mac;
-            for (int j=0; j < sizeof(server_mac); j++) {
-              if (candidate_mac[j] == server_mac[j]) {
+            if (candidate_mac) {
+              if (mac_addrs_match(&server_mac, &candidate_mac)) {
                 host = cfg->registered_hosts[hidx];
                 break;
               }
@@ -343,8 +344,6 @@ void config_serialize(VitaChiakiConfig* cfg) {
 
   for (int i = 0; i < cfg->num_manual_hosts; i++) {
     VitaChiakiHost* host = cfg->manual_hosts[i];
-    fprintf(fp, "\n\n[[manual_hosts]]\n");
-    fprintf(fp, "hostname = \"%s\"\n", host->hostname);
     uint8_t* mac = NULL;
     for (int m = 0; m < 6; m++) {
       if (host->server_mac[m] != 0) {
@@ -353,6 +352,9 @@ void config_serialize(VitaChiakiConfig* cfg) {
       }
     }
     if (mac) {
+      // only save if mac is valid
+      fprintf(fp, "\n\n[[manual_hosts]]\n");
+      fprintf(fp, "hostname = \"%s\"\n", host->hostname);
       serialize_b64(fp, "server_mac", mac, 6);
     }
   }
