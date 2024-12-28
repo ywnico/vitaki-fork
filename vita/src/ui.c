@@ -463,9 +463,14 @@ void load_psn_id_if_needed() {
   if (context.config.psn_account_id == NULL || strlen(context.config.psn_account_id) < 1) {
     char accIDBuf[8];
     memset(accIDBuf, 0, sizeof(accIDBuf));
-    free(context.config.psn_account_id);
-    context.config.psn_account_id = (char*)malloc(get_base64_size(sizeof(accIDBuf))+1); // WHY IS +1 NEEDED HERE ONLY WHEN RUN ON THE FIRST FRAME BECAUSE ITS 14 THEN FOR SOME REASON AND ADDING 1 MAKES IT 12????????? BUT THEN EVERY TIME AFTER IT REMAINS 12 DESPITE ADDING 1 SO IT SOMEHOW WORKS?????????????????????????????????????
+    if (context.config.psn_account_id) {
+      free(context.config.psn_account_id);
+    }
     sceRegMgrGetKeyBin("/CONFIG/NP/", "account_id", accIDBuf, sizeof(accIDBuf));
+
+    int b64_strlen = get_base64_size(sizeof(accIDBuf));
+    context.config.psn_account_id = (char*)malloc(b64_strlen+1); // + 1 for null termination
+    context.config.psn_account_id[b64_strlen] = 0; // null terminate
     chiaki_base64_encode(accIDBuf, sizeof(accIDBuf), context.config.psn_account_id, get_base64_size(sizeof(accIDBuf)));
     LOGD("size of id %d", strlen(context.config.psn_account_id));
   }
@@ -587,6 +592,8 @@ char* CONTROLLER_MAP_ID_LABEL = "Controller map";
 /// Draw the settings form
 /// @return whether the dialog should keep rendering
 bool draw_settings() {
+  int font_size = 18;
+
   char* psntext = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 1, 30, 30, 600, 80, PSNID_LABEL, context.config.psn_account_id, 20);
   if (psntext != NULL) {
     // LOGD("psntext is %s", psntext);
@@ -595,6 +602,12 @@ bool draw_settings() {
     load_psn_id_if_needed();
     config_serialize(&context.config);
   }
+  vita2d_font_draw_text(font, 30, 106, COLOR_WHITE, font_size,
+                        "Press start to reset"
+                        );
+  vita2d_font_draw_text(font, 30, 127, COLOR_WHITE, font_size,
+                        "from device account"
+                        );
 
   int ctrlmap_id = number_input(UI_MAIN_WIDGET_TEXT_INPUT | 2, 30, 140, 600, 80, CONTROLLER_MAP_ID_LABEL, context.config.controller_map_id);
   if (ctrlmap_id != -1) {
@@ -604,7 +617,6 @@ bool draw_settings() {
   }
 
   // Draw controller text notes
-  int font_size = 18;
   int info_x = 30;
   int info_y = 250;
   int info_y_delta = 21;
@@ -651,6 +663,14 @@ bool draw_settings() {
   }
   if (btn_pressed(SCE_CTRL_UP)) {
     context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 1);
+  }
+
+  if (btn_pressed(SCE_CTRL_START)) {
+    if (context.config.psn_account_id) {
+      free(context.config.psn_account_id);
+    }
+    context.config.psn_account_id = NULL;
+    load_psn_id_if_needed();
   }
 
   if (btn_pressed(SCE_CTRL_CIRCLE)) {

@@ -53,7 +53,7 @@ bool vita_chiaki_init_context() {
   update_context_hosts();
 
   // init ui to select a certain button
-  context.ui_state.active_item = UI_MAIN_WIDGET_MESSAGES_BTN;
+  context.ui_state.active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
   context.ui_state.next_active_item = context.ui_state.active_item;
 
   return true;
