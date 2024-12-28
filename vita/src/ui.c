@@ -774,7 +774,14 @@ bool draw_add_host_dialog() {
 
     bool is_ps5 = chiaki_target_is_ps5(rhost->target);
     char this_host_info[100];
-    snprintf(this_host_info, 100, "%d: %s (%s)", rhost_idx, rhost->registered_state->server_nickname, is_ps5 ? "PS5" : "PS4");
+    char* nickname = rhost->registered_state->server_nickname;
+    if (!nickname) nickname = "";
+    snprintf(this_host_info, 100, "%d: %s [%X%X%X%X%X%X] (%s)", rhost_idx,
+             nickname, rhost->server_mac[0], rhost->server_mac[1],
+             rhost->server_mac[2], rhost->server_mac[3], rhost->server_mac[4], rhost->server_mac[5],
+             is_ps5 ? "PS5" : "PS4");
+
+
     vita2d_font_draw_text(font, info_x, info_y + 2*(j+1)*info_y_delta, COLOR_WHITE, font_size,
                           this_host_info
                           );
@@ -800,15 +807,44 @@ bool draw_add_host_dialog() {
     context.ui_state.next_active_item = (UI_MAIN_WIDGET_TEXT_INPUT | 1);
   }
 
-  if (btn_pressed(SCE_CTRL_CIRCLE) | btn_pressed(SCE_CTRL_TRIANGLE)) {
-    if (btn_pressed(SCE_CTRL_TRIANGLE)) {
-      // TODO add new host
-    }
+  // reset CONSOLENUM if invalid
+  if (CONSOLENUM >= context.config.num_registered_hosts) {
+    CONSOLENUM = -1;
+  }
+
+  // reset REMOTEIP if invalid
+  // TODO trim whitespace? too hard in c....
+  if (!REMOTEIP) {
+      REMOTEIP = "";
+  }
+
+  // cancel
+  if (btn_pressed(SCE_CTRL_CIRCLE)) {
     context.ui_state.next_active_item = UI_MAIN_WIDGET_ADD_HOST_BTN;
     REMOTEIP = "";
     CONSOLENUM = -1;
     return false;
   }
+
+  // save (if pos)
+  if (btn_pressed(SCE_CTRL_TRIANGLE)) {
+    if ((REMOTEIP != NULL) && (strlen(REMOTEIP) != 0)) {
+      if ((CONSOLENUM >= 0) && (CONSOLENUM < context.config.num_registered_hosts)) {
+        VitaChiakiHost* rhost = context.config.registered_hosts[CONSOLENUM];
+        if (rhost) {
+          // save new host
+          save_manual_host(rhost, REMOTEIP);
+
+          // exit
+          context.ui_state.next_active_item = UI_MAIN_WIDGET_ADD_HOST_BTN;
+          REMOTEIP = "";
+          CONSOLENUM = -1;
+          return false;
+        }
+      }
+    }
+  }
+
   return true;
 }
 

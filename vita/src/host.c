@@ -419,3 +419,60 @@ bool mac_addrs_match(MacAddr* a, MacAddr* b) {
   }
   return true;
 }
+
+/// Save a new manual host into the context, given existing registered host and new remote ip ("hostname")
+void save_manual_host(VitaChiakiHost* rhost, char* new_hostname) {
+  // TODO Check if the host already exists, and if not, locate a free spot for it
+
+  // copy mac address
+  uint8_t host_mac[6];
+  memcpy(&host_mac, &(rhost->server_mac), 6);
+
+  for (int i = 0; i < context.config.num_manual_hosts; i++) {
+    VitaChiakiHost* h = context.config.manual_hosts[i];
+    CHIAKI_LOGW(&(context.log), "CHECKING MANUAL HOST %d (%s)", i, h->hostname);
+      if (strcmp(h->hostname, new_hostname)) {
+      CHIAKI_LOGW(&(context.log), "  HOSTNAMES MATCH");
+      }
+    if (mac_addrs_match(&(h->server_mac), &host_mac)) {
+      CHIAKI_LOGW(&(context.log), "  MACS MATCH");
+      if (strcmp(h->hostname, new_hostname)) {
+        // this manual host already exists (same mac addr and hostname)
+        CHIAKI_LOGW(&(context.log), "Duplicate manual host. Not saving.");
+        return;
+      }
+    }
+  }
+
+  VitaChiakiHost* newhost = (VitaChiakiHost*)malloc(sizeof(VitaChiakiHost));
+  newhost->registered_state = NULL;
+  newhost->hostname = strdup(new_hostname);
+  memcpy(&(newhost->server_mac), &host_mac, 6);
+  newhost->type |= MANUALLY_ADDED;
+  // newhost->type |= REGISTERED; // ??
+  newhost->target = rhost->target;
+
+  CHIAKI_LOGI(&(context.log), "--");
+  CHIAKI_LOGI(&(context.log), "Adding manual host:");
+
+  if(newhost->hostname)
+    CHIAKI_LOGI(&(context.log), "Host Name (address):               %s", newhost->hostname);
+  if(host_mac)
+    CHIAKI_LOGI(&(context.log), "Host MAC:                          %X%X%X%X%X%X\n", host_mac[0], host_mac[1], host_mac[2], host_mac[3], host_mac[4], host_mac[5]);
+  CHIAKI_LOGI(&(context.log),   "Is PS5:                            %s", chiaki_target_is_ps5(newhost->target) ? "true" : "false");
+
+  CHIAKI_LOGI(&(context.log), "--");
+
+  if (context.config.num_manual_hosts >= MAX_NUM_HOSTS) { // TODO change to manual max
+    CHIAKI_LOGE(&(context.log), "Max manual hosts reached; could not save.");
+    return;
+  }
+
+  // Save to manual hosts
+  context.config.manual_hosts[context.config.num_manual_hosts++] = newhost;
+
+  // Save config
+  config_serialize(&context.config);
+
+  // TODO update hosts in context
+}
