@@ -65,21 +65,6 @@ vita2d_texture *btn_register, *btn_register_active, *btn_add, *btn_add_active,
     *img_ps4_off, *img_ps4_rest, *img_ps5, *img_ps5_off, *img_ps5_rest,
     *img_header, *img_discovery_host;
 
-/// Identifiers of various widgets on the screen
-typedef enum ui_main_widget_id_t {
-  UI_MAIN_WIDGET_ADD_HOST_BTN,
-  UI_MAIN_WIDGET_REGISTER_BTN,
-  UI_MAIN_WIDGET_DISCOVERY_BTN,
-  UI_MAIN_WIDGET_MESSAGES_BTN,
-  UI_MAIN_WIDGET_SETTINGS_BTN,
-
-  // needs to bitwise mask with up to 4 items (current max host count), so >=2 bits (may be increased in the future), and 4 is already occupied by MESSAGES_BTN
-  UI_MAIN_WIDGET_HOST_TILE = 1 << 3,
-
-  // FIXME: this is bound to fail REALLY fast if we start adding more inputs in the future
-  UI_MAIN_WIDGET_TEXT_INPUT = 1 << 6,
-} MainWidgetId;
-
 /// Types of actions that can be performed on hosts
 typedef enum ui_host_action_t {
   UI_HOST_ACTION_NONE = 0,
@@ -705,7 +690,42 @@ int CONSOLENUM = -1;
 
 /// Draw the form to manually add a new host
 /// @return whether the dialog should keep rendering
-bool draw_add_host_dialog() { 
+bool draw_add_host_dialog() {
+
+  // check if any registered host exists. If not, display a message and no UI.
+  bool registered_host_exists = false;
+  for (int rhost_idx = 0; rhost_idx < context.config.num_registered_hosts; rhost_idx++) {
+    VitaChiakiHost* rhost = context.config.registered_hosts[rhost_idx];
+    if (rhost) {
+      registered_host_exists = true;
+      break;
+    }
+  }
+
+  if (!registered_host_exists) {
+    int font_size = 24;
+    int info_y_delta = 31;
+    int info_x = 30;
+    int info_y = 40;
+
+    vita2d_font_draw_text(font, info_x, info_y, COLOR_WHITE, font_size,
+                          "No registered hosts found."
+                          );
+    vita2d_font_draw_text(font, info_x, info_y + info_y_delta, COLOR_WHITE, font_size,
+                          "Pair to a console on a local network first."
+                          );
+
+    if (btn_pressed(SCE_CTRL_CIRCLE) | btn_pressed(SCE_CTRL_CROSS)) {
+      context.ui_state.next_active_item = UI_MAIN_WIDGET_ADD_HOST_BTN;
+      REMOTEIP = "";
+      CONSOLENUM = -1;
+      return false;
+    }
+    return true;
+  }
+
+  // at least one registered host exists, so draw ui
+
   char* remoteip_text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 1, 30, 30, 600, 80, REMOTEIP_LABEL, REMOTEIP, 20);
   if (remoteip_text != NULL) {
     //if (REMOTEIP != NULL) free(REMOTEIP);
@@ -734,7 +754,8 @@ bool draw_add_host_dialog() {
   int info_y = 250;
   int info_y_delta = 21;
 
-  bool host_exists = false;
+  // write host list if possible
+  int host_exists = false;
   int j = 0;
   for (int rhost_idx = 0; rhost_idx < context.config.num_registered_hosts; rhost_idx++) {
     VitaChiakiHost* rhost = context.config.registered_hosts[rhost_idx];
@@ -762,13 +783,14 @@ bool draw_add_host_dialog() {
   }
 
   if (!host_exists) {
+    // this should never be shown
     vita2d_font_draw_text(font, info_x, info_y, COLOR_WHITE, font_size,
-                          "No consoles registered! Register a console locally first."
+                          "No registered hosts found. Pair to a console on a local network first."
                           );
   }
 
   vita2d_font_draw_text(font, info_x, info_y + 12*info_y_delta, COLOR_WHITE, font_size,
-                        "Circle: save and add host. Triangle: Exit without saving."
+                        "Triangle: save and add host. Circle: Exit without saving."
                         );
 
   if (btn_pressed(SCE_CTRL_DOWN)) {
@@ -779,7 +801,7 @@ bool draw_add_host_dialog() {
   }
 
   if (btn_pressed(SCE_CTRL_CIRCLE) | btn_pressed(SCE_CTRL_TRIANGLE)) {
-    if (btn_pressed(SCE_CTRL_CIRCLE)) {
+    if (btn_pressed(SCE_CTRL_TRIANGLE)) {
       // TODO add new host
     }
     context.ui_state.next_active_item = UI_MAIN_WIDGET_ADD_HOST_BTN;
