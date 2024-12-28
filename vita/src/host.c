@@ -450,6 +450,9 @@ void save_manual_host(VitaChiakiHost* rhost, char* new_hostname) {
   // newhost->type |= REGISTERED; // ??
   newhost->target = rhost->target;
 
+  // TODO copy? does this need to be set at all?
+  //newhost->registered_state = rhost->registered_state;
+
   CHIAKI_LOGI(&(context.log), "--");
   CHIAKI_LOGI(&(context.log), "Adding manual host:");
 
