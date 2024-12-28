@@ -426,17 +426,15 @@ void save_manual_host(VitaChiakiHost* rhost, char* new_hostname) {
 
   // copy mac address
   uint8_t host_mac[6];
+  if ((!rhost->server_mac)) {
+    CHIAKI_LOGE(&(context.log), "Failed to get registered host mac; could not save.");
+  }
   memcpy(&host_mac, &(rhost->server_mac), 6);
 
   for (int i = 0; i < context.config.num_manual_hosts; i++) {
     VitaChiakiHost* h = context.config.manual_hosts[i];
-    CHIAKI_LOGW(&(context.log), "CHECKING MANUAL HOST %d (%s)", i, h->hostname);
-      if (strcmp(h->hostname, new_hostname)) {
-      CHIAKI_LOGW(&(context.log), "  HOSTNAMES MATCH");
-      }
     if (mac_addrs_match(&(h->server_mac), &host_mac)) {
-      CHIAKI_LOGW(&(context.log), "  MACS MATCH");
-      if (strcmp(h->hostname, new_hostname)) {
+      if (strcmp(h->hostname, new_hostname) == 0) {
         // this manual host already exists (same mac addr and hostname)
         CHIAKI_LOGW(&(context.log), "Duplicate manual host. Not saving.");
         return;

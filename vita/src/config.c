@@ -134,6 +134,7 @@ void config_parse(VitaChiakiConfig* cfg) {
           parse_b64(datum.u.s, host->server_mac, 6);
           printf("MAC %X%X%X%X%X%X\n", host->server_mac[0], host->server_mac[1], host->server_mac[2],
                           host->server_mac[3], host->server_mac[4], host->server_mac[5]);
+          memcpy(&rstate->server_mac, &(host->server_mac), 6);
           free(datum.u.s);
         }
         datum = toml_string_in(host_cfg, "server_nickname");
