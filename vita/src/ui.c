@@ -671,6 +671,7 @@ bool draw_settings() {
     }
     context.config.psn_account_id = NULL;
     load_psn_id_if_needed();
+    config_serialize(&context.config);
   }
 
   if (btn_pressed(SCE_CTRL_CIRCLE)) {
