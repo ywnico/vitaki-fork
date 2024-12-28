@@ -160,14 +160,14 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
     vita2d_font_draw_text(font, x + 255, y + 23, COLOR_WHITE, 20,
                          host->discovery_state->host_id);
   } else if (registered) {
-    uint8_t* host_mac = host->registered_state->server_mac;
-    vita2d_font_draw_textf(font, x + 68, y + 40, COLOR_WHITE, 32,
+    char* nickname = host->registered_state->server_nickname;
+    if (!nickname) nickname = "";
+    uint8_t* host_mac = host->server_mac;
+    vita2d_font_draw_text(font, x + 68, y + 40, COLOR_WHITE, 40,
+                          nickname);
+    vita2d_font_draw_textf(font, x + 255, y + 23, COLOR_WHITE, 20,
                           "%X%X%X%X%X%X", host_mac[0], host_mac[1], host_mac[2],
                           host_mac[3], host_mac[4], host_mac[5]);
-    if (host->discovery_state) {
-      vita2d_font_draw_text(font, x + 255, y + 23, COLOR_WHITE, 20,
-                            host->discovery_state->host_id);
-    }
   }
 
   // Draw host address
@@ -222,7 +222,7 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
       if (last_slot >= host_slot + 2 && host_slot < 2) {
         // Set focus on the host tile directly below
         context.ui_state.next_active_item =
-            UI_MAIN_WIDGET_SETTINGS_BTN | (host_slot + 2);
+            UI_MAIN_WIDGET_HOST_TILE | (host_slot + 2);
       }
     } else if (btn_pressed(SCE_CTRL_LEFT)) {
       if (host_slot == 1 || host_slot == 3) {
@@ -545,7 +545,6 @@ UIScreenType draw_main_menu() {
   } else if (host_action == UI_HOST_ACTION_REGISTER) {
     next_screen = UI_SCREEN_TYPE_REGISTER_HOST;
   }
-
 
   // Add "tooltip" in bottom of screen
   int font_size = 18;
@@ -1025,6 +1024,26 @@ void draw_ui() {
       // Get current touch state
       sceTouchPeek(SCE_TOUCH_PORT_FRONT, &(context.ui_state.touch_state_front),
                   1);
+
+
+      // handle invalid items
+      int this_active_item = context.ui_state.next_active_item;
+      if (this_active_item == -1) {
+        this_active_item = context.ui_state.active_item;
+      }
+      if (this_active_item > -1) {
+        if (this_active_item & UI_MAIN_WIDGET_HOST_TILE) {
+          if (context.num_hosts == 0) {
+            // return to toolbar
+            context.ui_state.next_active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
+          } else {
+            int host_j = this_active_item - UI_MAIN_WIDGET_HOST_TILE;
+            if (host_j >= context.num_hosts) {
+              context.ui_state.next_active_item = UI_MAIN_WIDGET_HOST_TILE | (context.num_hosts-1);
+            }
+          }
+        }
+      }
 
       if (context.ui_state.next_active_item >= 0) {
         context.ui_state.active_item = context.ui_state.next_active_item;

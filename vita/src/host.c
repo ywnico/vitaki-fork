@@ -483,9 +483,34 @@ void save_manual_host(VitaChiakiHost* rhost, char* new_hostname) {
   update_context_hosts();
 }
 
+int count_nonnull_context_hosts() {
+  int sum = 0;
+  for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
+    VitaChiakiHost *h = context.hosts[host_idx];
+    if (h) {
+      sum += 1;
+    }
+  }
+  return sum;
+}
+
 void update_context_hosts() {
   bool hide_remote_if_discovered = true;
 
+  // Remove any empty slots
+  // TODO could make more efficient but eh
+  for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
+      VitaChiakiHost* h = context.hosts[host_idx];
+      if (!h) {
+        // slide all hosts back one slot
+        for (int j = host_idx+1; j < MAX_NUM_HOSTS; j++) {
+          context.hosts[j-1] = context.hosts[j];
+        }
+        context.hosts[MAX_NUM_HOSTS-1] = NULL;
+      }
+  }
+
+  // Add in manual hosts
   for (int i = 0; i < context.config.num_manual_hosts; i++) {
     VitaChiakiHost* mhost = context.config.manual_hosts[i];
 
@@ -533,6 +558,9 @@ void update_context_hosts() {
     }
 
   }
+
+  // Update num_hosts
+  context.num_hosts = count_nonnull_context_hosts();
 }
 
 void copy_host(VitaChiakiHost* h_dest, VitaChiakiHost* h_src, bool copy_hostname) {
