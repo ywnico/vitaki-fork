@@ -82,9 +82,15 @@ int host_register(VitaChiakiHost* host, int pin) {
 
 int host_wakeup(VitaChiakiHost* host) {
   if (!host->hostname || !host->discovery_state) {
+    LOGE("Missing hostname or discovery_state. Cannot send wakeup signal.");
     return 1;
   }
-  chiaki_discovery_wakeup(&context.log, context.discovery_enabled ? &context.discovery.discovery : NULL, host->hostname, *host->registered_state->rp_regist_key, chiaki_target_is_ps5(host->target));
+  LOGD("Attempting to send wakeup signal....");
+	uint64_t credential = (uint64_t)strtoull(host->registered_state->rp_regist_key, NULL, 16);
+  chiaki_discovery_wakeup(&context.log,
+                          context.discovery_enabled ? &context.discovery.discovery : NULL,
+                          host->hostname, credential,
+                          chiaki_target_is_ps5(host->target));
   return 0;
 }
 
@@ -447,7 +453,7 @@ void save_manual_host(VitaChiakiHost* rhost, char* new_hostname) {
   newhost->hostname = strdup(new_hostname);
   memcpy(&(newhost->server_mac), &host_mac, 6);
   newhost->type |= MANUALLY_ADDED;
-  // newhost->type |= REGISTERED; // ??
+  newhost->type |= REGISTERED;
   newhost->target = rhost->target;
 
   // TODO copy? does this need to be set at all?

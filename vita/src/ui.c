@@ -252,7 +252,7 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
     //   }
     // }
     if (registered && btn_pressed(SCE_CTRL_CROSS)) {
-      if (host->discovery_state->state == CHIAKI_DISCOVERY_HOST_STATE_STANDBY) {
+      if (at_rest) {
         return UI_HOST_ACTION_WAKEUP;
       } else {
         vita2d_end_drawing();
@@ -262,6 +262,10 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
         return UI_HOST_ACTION_STREAM;
       }
     } else if (!registered && !added && discovered && btn_pressed(SCE_CTRL_CROSS)){
+      if (at_rest) {
+        LOGD("Cannot wake unregistered console.");
+        return UI_HOST_ACTION_NONE;
+      }
       return UI_HOST_ACTION_REGISTER;
     } else if (mutable && btn_pressed(SCE_CTRL_TRIANGLE)) {
       return UI_HOST_ACTION_DELETE;
@@ -534,7 +538,7 @@ UIScreenType draw_main_menu() {
   } else if (host_action == UI_HOST_ACTION_STREAM) {
     next_screen = UI_SCREEN_TYPE_MESSAGES;
   } else if (host_action == UI_HOST_ACTION_EDIT) {
-    next_screen = UI_SCREEN_TYPE_REGISTER_HOST;
+    // next_screen = UI_SCREEN_TYPE_REGISTER_HOST;
     // next_screen = UI_SCREEN_TYPE_EDIT_HOST;
   } else if (host_action == UI_HOST_ACTION_REGISTER) {
     next_screen = UI_SCREEN_TYPE_REGISTER_HOST;
