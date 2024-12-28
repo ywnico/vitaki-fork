@@ -200,6 +200,11 @@ void config_parse(VitaChiakiConfig* cfg) {
       LOGD("Found %d manual hosts", num_mhosts);
       for (int i=0; i < MIN(MAX_NUM_HOSTS, num_mhosts) ; i++) {
         VitaChiakiHost* host = NULL;
+
+        bool has_mac = false;
+        bool has_hostname = false;
+        bool has_registration = false;
+
         toml_table_t* host_cfg = toml_table_at(manual_hosts, i);
         datum = toml_string_in(host_cfg, "server_mac");
         uint8_t server_mac[6];
@@ -207,33 +212,42 @@ void config_parse(VitaChiakiConfig* cfg) {
           // We have a MAC for the manual host, try to find corresponding
           // registered host
           parse_b64(datum.u.s, server_mac, sizeof(server_mac));
+          has_mac = true;
           free(datum.u.s);
           for (int hidx=0; hidx < cfg->num_registered_hosts; hidx++) {
             uint8_t* candidate_mac = cfg->registered_hosts[hidx]->server_mac;
             if (candidate_mac) {
-              if (mac_addrs_match(&server_mac, &candidate_mac)) {
-                host = cfg->registered_hosts[hidx];
+              if (mac_addrs_match(&server_mac, candidate_mac)) {
+                // copy registered host (TODO for the registered_state, should we use a pointer instead?)
+                host = malloc(sizeof(VitaChiakiHost));
+                copy_host(host, cfg->registered_hosts[hidx], false);
+                host->type = REGISTERED;
+                has_registration = true;
                 break;
               }
             }
           }
         }
         if (!host) {
-          // No corresponding registered host found, create new host and assign
-          // MAC if specified.
-          host = malloc(sizeof(VitaChiakiHost));
-          if (datum.ok) {
-            memcpy(host->server_mac, server_mac, sizeof(server_mac));
-          }
+          // No corresponding registered host found. Don't save.
+          CHIAKI_LOGW(&(context.log), "Manual host missing registered host.");
+          continue;
         }
+
+        host->type |= MANUALLY_ADDED;
+        host->type &= ~DISCOVERED; // ensure discovered is off
 
         datum = toml_string_in(host_cfg, "hostname");
         if (datum.ok) {
           host->hostname = datum.u.s;
+          has_hostname = true;
+        }
+
+        if (has_hostname && has_mac) {
           cfg->manual_hosts[i] = host;
           cfg->num_manual_hosts++;
         } else {
-          CHIAKI_LOGW(&(context.log), "Failed to parse manual host due to missing hostname.");
+          CHIAKI_LOGW(&(context.log), "Failed to parse manual host due to missing hostname or mac.");
           free(host);
         }
       }

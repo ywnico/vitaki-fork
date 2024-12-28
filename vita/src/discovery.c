@@ -14,27 +14,30 @@
 
 /// Save a newly discovered host into the context
 void save_discovered_host(ChiakiDiscoveryHost* host) {
+  CHIAKI_LOGI(&(context.log), "Saving discovered host...");
   // Check if the host is already known, and if not, locate a free spot for it
   uint8_t host_mac[6];
   parse_b64(host->host_id, host_mac, sizeof(host_mac));
   int target_idx = -1;
   VitaChiakiHost* h;
+  // TODO fix this logic...
   for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
     h = context.hosts[host_idx];
     if (h == NULL) {
       // Found a free spot
-      target_idx = host_idx;
-      break;
+      if (target_idx < 0) {
+        target_idx = host_idx;
+        break;
+      }
     } else if (h->type & DISCOVERED) {
       if (mac_addrs_match(&(h->server_mac), &host_mac)) {
         // Already known discovered hosts, we can skip saving
         return;
       }
     } else if (h->type & MANUALLY_ADDED) {
-      if (strcmp(h->hostname, host->host_addr)) {
+      if (mac_addrs_match(&(h->server_mac), &host_mac)) {
         // Manually added host matched this discovered host, update
         target_idx = host_idx;
-        break;
       }
     }
   }
@@ -42,6 +45,7 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
   // Maximum number of hosts reached, can't save host
   // TODO: Indicate to user?
   if (target_idx < 0) {
+    CHIAKI_LOGE(&(context.log), "Max # of hosts reached; could not save newly discovered host.");
     return;
   }
 

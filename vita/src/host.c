@@ -428,8 +428,6 @@ bool mac_addrs_match(MacAddr* a, MacAddr* b) {
 
 /// Save a new manual host into the context, given existing registered host and new remote ip ("hostname")
 void save_manual_host(VitaChiakiHost* rhost, char* new_hostname) {
-  // TODO Check if the host already exists, and if not, locate a free spot for it
-
   // copy mac address
   uint8_t host_mac[6];
   if ((!rhost->server_mac)) {
@@ -481,5 +479,91 @@ void save_manual_host(VitaChiakiHost* rhost, char* new_hostname) {
   // Save config
   config_serialize(&context.config);
 
-  // TODO update hosts in context
+  // update hosts in context
+  update_context_hosts();
+}
+
+void update_context_hosts() {
+  bool hide_remote_if_discovered = true;
+
+  for (int i = 0; i < context.config.num_manual_hosts; i++) {
+    VitaChiakiHost* mhost = context.config.manual_hosts[i];
+
+    // first, check if it (or the local discovered version of the same console) is already in context
+    bool already_in_context = false;
+    for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
+      VitaChiakiHost* h = context.hosts[host_idx];
+      if (!h) continue;
+      if ((!h->server_mac) || (!h->hostname)) continue;
+      if (mac_addrs_match(&(h->server_mac), &(mhost->server_mac))) {
+        // it's the same console
+
+        if ((h->type & DISCOVERED) && hide_remote_if_discovered) {
+          // found matching discovered console
+          already_in_context = true;
+          break;
+        }
+
+        if ((h->type & MANUALLY_ADDED) && (strcmp(h->hostname, mhost->hostname) == 0)) {
+          // found identical manual console
+          already_in_context = true;
+          break;
+        }
+      }
+    }
+
+    if (already_in_context) {
+      continue;
+    }
+
+    // the host is not in the context yet. Find an empty spot for it, if possible.
+    bool added_to_context = false;
+    for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
+      VitaChiakiHost* h = context.hosts[host_idx];
+      if (h == NULL) {
+        // empty spot
+        context.hosts[host_idx] = mhost;
+        added_to_context = true;
+        break;
+      }
+    }
+
+    if (!added_to_context) {
+      CHIAKI_LOGE(&(context.log), "Max # of hosts reached; could not add manual host %d to context.", i);
+    }
+
+  }
+}
+
+void copy_host(VitaChiakiHost* h_dest, VitaChiakiHost* h_src, bool copy_hostname) {
+        h_dest->type = h_src->type;
+        h_dest->target = h_src->target;
+        if (h_src->server_mac) {
+          memcpy(&h_dest->server_mac, &(h_src->server_mac), 6);
+        }
+
+        h_dest->hostname = NULL;
+        if ((h_src->hostname) && copy_hostname) {
+          h_dest->hostname = strdup(h_src->hostname);
+        }
+
+        // copy registered state
+        h_dest->registered_state = NULL;
+        ChiakiRegisteredHost* rstate_src = h_src->registered_state;
+        if (rstate_src) {
+          ChiakiRegisteredHost* rstate_dest = malloc(sizeof(ChiakiRegisteredHost));
+          h_dest->registered_state = rstate_dest;
+
+
+          if (rstate_src->server_nickname) {
+            strncpy(rstate_dest->server_nickname, rstate_src->server_nickname, sizeof(rstate_dest->server_nickname));
+          }
+          rstate_dest->target = rstate_src->target;
+          memcpy(rstate_dest->rp_key, rstate_src->rp_key, sizeof(rstate_dest->rp_key));
+          rstate_dest->rp_key_type = rstate_src->rp_key_type;
+          memcpy(rstate_dest->rp_regist_key, rstate_src->rp_regist_key, sizeof(rstate_dest->rp_regist_key));
+        }
+
+        // don't copy discovery state
+        h_dest->discovery_state = NULL;
 }

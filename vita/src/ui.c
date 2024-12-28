@@ -113,7 +113,7 @@ void load_textures() {
   img_ps4_off = vita2d_load_PNG_file(IMG_PS4_OFF_PATH);
   img_ps4_rest = vita2d_load_PNG_file(IMG_PS4_REST_PATH);
   img_ps5 = vita2d_load_PNG_file(IMG_PS5_PATH);
-  img_ps4_off = vita2d_load_PNG_file(IMG_PS4_OFF_PATH);
+  img_ps5_off = vita2d_load_PNG_file(IMG_PS5_OFF_PATH);
   img_ps5_rest = vita2d_load_PNG_file(IMG_PS5_REST_PATH);
   img_discovery_host = vita2d_load_PNG_file(IMG_DISCOVERY_HOST);
 }
@@ -134,7 +134,7 @@ bool is_touched(int x, int y, int width, int height) {
 UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
   int active_id = context.ui_state.active_item;
   bool is_active = active_id == (UI_MAIN_WIDGET_HOST_TILE | host_slot);
-  bool discovered = host->type & DISCOVERED;
+  bool discovered = (host->type & DISCOVERED) && (host->discovery_state);
   bool registered = host->type & REGISTERED;
   bool added = host->type & MANUALLY_ADDED;
   bool mutable = (added || registered);
@@ -164,8 +164,10 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
     vita2d_font_draw_textf(font, x + 68, y + 40, COLOR_WHITE, 32,
                           "%X%X%X%X%X%X", host_mac[0], host_mac[1], host_mac[2],
                           host_mac[3], host_mac[4], host_mac[5]);
-    vita2d_font_draw_text(font, x + 255, y + 23, COLOR_WHITE, 20,
-                         host->discovery_state->host_id);
+    if (host->discovery_state) {
+      vita2d_font_draw_text(font, x + 255, y + 23, COLOR_WHITE, 20,
+                            host->discovery_state->host_id);
+    }
   }
 
   // Draw host address
@@ -174,8 +176,8 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
   vita2d_texture* console_img;
   bool is_ps5 = chiaki_target_is_ps5(host->target);
   // TODO: Don't use separate textures for off/on/rest, use tinting instead
-  if (added && !discovered) {
-    console_img = is_ps5 ? img_ps5 : img_ps4;
+  if (added) {// && !discovered) {
+    console_img = is_ps5 ? img_ps5_off : img_ps4_off;
   } else if (at_rest) {
     console_img = is_ps5 ? img_ps5_rest : img_ps4_rest;
   } else {
