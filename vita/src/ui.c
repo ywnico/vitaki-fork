@@ -25,13 +25,13 @@
 #define VITA_HEIGHT 544
 
 #define HEADER_BAR_X 136
-#define HEADER_BAR_Y 45
+#define HEADER_BAR_Y 43
 #define HEADER_BAR_H 26
 #define HEADER_BAR_W 774
 #define HOST_SLOTS_X HEADER_BAR_X - 86
-#define HOST_SLOTS_Y HEADER_BAR_Y + HEADER_BAR_H + 45
+#define HOST_SLOTS_Y HEADER_BAR_Y + HEADER_BAR_H + 43
 #define HOST_SLOT_W 400
-#define HOST_SLOT_H 200
+#define HOST_SLOT_H 190
 
 #define TEXTURE_PATH "app0:/assets/"
 #define BTN_REGISTER_PATH TEXTURE_PATH "btn_register.png"
