@@ -304,7 +304,7 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
         vita2d_end_drawing();
         vita2d_common_dialog_update();
         vita2d_swap_buffers();
-        host_stream(context.active_host);
+        int err = host_stream(context.active_host);
         return UI_HOST_ACTION_STREAM;
       }
     } else if (!registered && !added && discovered && btn_pressed(SCE_CTRL_CROSS)){
@@ -577,7 +577,11 @@ UIScreenType draw_main_menu() {
       continue;
     }
     host_action = host_tile(host_slots, host);
+
     host_slots++;
+
+    // don't keep trying to draw tiles, since we just called vita2d_end_drawing();
+    if (host_action == UI_HOST_ACTION_STREAM) break;
   }
   if (host_slots == 0) {
     // TODO: Draw a "Please add a host via the header bar" message

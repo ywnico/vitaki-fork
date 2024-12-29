@@ -366,8 +366,6 @@ int host_stream(VitaChiakiHost* host) {
 		context.config.resolution, context.config.fps);
   // profile.bitrate = 15000;
 	// Build chiaki ps4 stream session
-	ChiakiAudioSink audio_sink;
-	chiaki_opus_decoder_init(&context.stream.opus_decoder, &context.log);
 	ChiakiConnectInfo chiaki_connect_info = {};
 
 	chiaki_connect_info.host = host->hostname;
@@ -387,6 +385,8 @@ int host_stream(VitaChiakiHost* host) {
   init_controller_map(&(context.stream.vcmi), context.config.controller_map_id);
 	context.stream.session_init = true;
 	// audio setting_cb and frame_cb
+	ChiakiAudioSink audio_sink;
+	chiaki_opus_decoder_init(&context.stream.opus_decoder, &context.log);
 	chiaki_opus_decoder_set_cb(&context.stream.opus_decoder, vita_audio_init, vita_audio_cb, NULL);
 	chiaki_opus_decoder_get_sink(&context.stream.opus_decoder, &audio_sink);
 	chiaki_session_set_audio_sink(&context.stream.session, &audio_sink);
