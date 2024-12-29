@@ -31,5 +31,7 @@ int host_wakeup(VitaChiakiHost* host);
 int host_stream(VitaChiakiHost* host);
 bool mac_addrs_match(MacAddr* a, MacAddr* b);
 void save_manual_host(VitaChiakiHost* rhost, char* new_hostname);
+void delete_manual_host(VitaChiakiHost* mhost);
 void update_context_hosts();
 void copy_host(VitaChiakiHost* h_dest, VitaChiakiHost* h_src, bool copy_hostname);
+void copy_host_registered_state(ChiakiRegisteredHost* rstate_dest, ChiakiRegisteredHost* rstate_src);

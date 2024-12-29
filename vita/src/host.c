@@ -12,20 +12,20 @@
 #include <chiaki/base64.h>
 #include <chiaki/session.h>
 
-void host_init(VitaChiakiHost* host) {
+void host_free(VitaChiakiHost *host) {
+  if (host) {
+    if (host->discovery_state) {
+      free(host->discovery_state);
+    }
+    if (host->registered_state) {
+      free(host->registered_state);
+    }
+    if (host->hostname) {
+      free(host->hostname);
+    }
+  }
 }
 
-void host_free(VitaChiakiHost* host) {
-  if (host->discovery_state) {
-    free(host->discovery_state);
-  }
-  if (host->registered_state) {
-    free(host->registered_state);
-  }
-  if (host->hostname) {
-    free(host->hostname);
-  }
-}
 ChiakiRegist regist = {};
 static void regist_cb(ChiakiRegistEvent *event, void *user) {
   LOGD("regist event %d", event->type);
@@ -428,16 +428,13 @@ bool mac_addrs_match(MacAddr* a, MacAddr* b) {
 
 /// Save a new manual host into the context, given existing registered host and new remote ip ("hostname")
 void save_manual_host(VitaChiakiHost* rhost, char* new_hostname) {
-  // copy mac address
-  uint8_t host_mac[6];
   if ((!rhost->server_mac)) {
     CHIAKI_LOGE(&(context.log), "Failed to get registered host mac; could not save.");
   }
-  memcpy(&host_mac, &(rhost->server_mac), 6);
 
   for (int i = 0; i < context.config.num_manual_hosts; i++) {
     VitaChiakiHost* h = context.config.manual_hosts[i];
-    if (mac_addrs_match(&(h->server_mac), &host_mac)) {
+    if (mac_addrs_match(&(h->server_mac), &(rhost->server_mac))) {
       if (strcmp(h->hostname, new_hostname) == 0) {
         // this manual host already exists (same mac addr and hostname)
         CHIAKI_LOGW(&(context.log), "Duplicate manual host. Not saving.");
@@ -447,23 +444,18 @@ void save_manual_host(VitaChiakiHost* rhost, char* new_hostname) {
   }
 
   VitaChiakiHost* newhost = (VitaChiakiHost*)malloc(sizeof(VitaChiakiHost));
-  newhost->registered_state = NULL;
+  copy_host(newhost, rhost, false);
   newhost->hostname = strdup(new_hostname);
-  memcpy(&(newhost->server_mac), &host_mac, 6);
-  newhost->type |= MANUALLY_ADDED;
-  newhost->type |= REGISTERED;
-  newhost->target = rhost->target;
-
-  // TODO copy? does this need to be set at all?
-  //newhost->registered_state = rhost->registered_state;
+  newhost->type = REGISTERED | MANUALLY_ADDED;
 
   CHIAKI_LOGI(&(context.log), "--");
   CHIAKI_LOGI(&(context.log), "Adding manual host:");
 
   if(newhost->hostname)
     CHIAKI_LOGI(&(context.log), "Host Name (address):               %s", newhost->hostname);
-  if(host_mac)
-    CHIAKI_LOGI(&(context.log), "Host MAC:                          %X%X%X%X%X%X\n", host_mac[0], host_mac[1], host_mac[2], host_mac[3], host_mac[4], host_mac[5]);
+  if(newhost->server_mac) {
+    CHIAKI_LOGI(&(context.log), "Host MAC:                          %X%X%X%X%X%X\n", newhost->server_mac[0], newhost->server_mac[1], newhost->server_mac[2], newhost->server_mac[3], newhost->server_mac[4], newhost->server_mac[5]);
+  }
   CHIAKI_LOGI(&(context.log),   "Is PS5:                            %s", chiaki_target_is_ps5(newhost->target) ? "true" : "false");
 
   CHIAKI_LOGI(&(context.log), "--");
@@ -479,8 +471,41 @@ void save_manual_host(VitaChiakiHost* rhost, char* new_hostname) {
   // Save config
   config_serialize(&context.config);
 
+  LOGD("> UPDATE CONTEXT...");
   // update hosts in context
   update_context_hosts();
+  LOGD("> UPDATE CONTEXT DONE");
+}
+
+
+void delete_manual_host(VitaChiakiHost* mhost) {
+
+  for (int i = 0; i < context.config.num_manual_hosts; i++) {
+    VitaChiakiHost* h = context.config.manual_hosts[i];
+    if (h == mhost) { // same object
+      context.config.manual_hosts[i] = NULL;
+    }
+  }
+  host_free(mhost);
+
+  // reorder manual hosts
+  for (int i = 0; i < context.config.num_manual_hosts; i++) {
+    VitaChiakiHost* h = context.config.manual_hosts[i];
+    if (!h) {
+      for (int j = i+1; j < context.config.num_manual_hosts; j++) {
+        context.config.manual_hosts[j-1] = context.config.manual_hosts[j];
+      }
+      context.config.manual_hosts[context.config.num_manual_hosts-1] = NULL;
+      context.config.num_manual_hosts--;
+    }
+  }
+
+  // Save config
+  config_serialize(&context.config);
+
+  // update hosts in context
+  update_context_hosts();
+
 }
 
 int count_nonnull_context_hosts() {
@@ -497,8 +522,27 @@ int count_nonnull_context_hosts() {
 void update_context_hosts() {
   bool hide_remote_if_discovered = true;
 
+  // Remove any no-longer-existent manual hosts
+  for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
+    VitaChiakiHost* h = context.hosts[host_idx];
+    if (h && (h->type & MANUALLY_ADDED)) {
+
+      // check if this host still exists
+      bool host_exists = false;
+      for (int i = 0; i < context.config.num_manual_hosts; i++) {
+        if (context.config.manual_hosts[i] == h) {
+          host_exists = true;
+          break;
+        }
+      }
+      if (!host_exists) {
+        context.hosts[host_idx] = NULL;
+      }
+    }
+  }
+
+
   // Remove any empty slots
-  // TODO could make more efficient but eh
   for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
       VitaChiakiHost* h = context.hosts[host_idx];
       if (!h) {
@@ -581,17 +625,21 @@ void copy_host(VitaChiakiHost* h_dest, VitaChiakiHost* h_src, bool copy_hostname
         if (rstate_src) {
           ChiakiRegisteredHost* rstate_dest = malloc(sizeof(ChiakiRegisteredHost));
           h_dest->registered_state = rstate_dest;
-
-
-          if (rstate_src->server_nickname) {
-            strncpy(rstate_dest->server_nickname, rstate_src->server_nickname, sizeof(rstate_dest->server_nickname));
-          }
-          rstate_dest->target = rstate_src->target;
-          memcpy(rstate_dest->rp_key, rstate_src->rp_key, sizeof(rstate_dest->rp_key));
-          rstate_dest->rp_key_type = rstate_src->rp_key_type;
-          memcpy(rstate_dest->rp_regist_key, rstate_src->rp_regist_key, sizeof(rstate_dest->rp_regist_key));
+          copy_host_registered_state(rstate_dest, rstate_src);
         }
 
         // don't copy discovery state
         h_dest->discovery_state = NULL;
+}
+
+void copy_host_registered_state(ChiakiRegisteredHost* rstate_dest, ChiakiRegisteredHost* rstate_src) {
+  if (rstate_src) {
+    if (rstate_src->server_nickname) {
+      strncpy(rstate_dest->server_nickname, rstate_src->server_nickname, sizeof(rstate_dest->server_nickname));
+    }
+    rstate_dest->target = rstate_src->target;
+    memcpy(rstate_dest->rp_key, rstate_src->rp_key, sizeof(rstate_dest->rp_key));
+    rstate_dest->rp_key_type = rstate_src->rp_key_type;
+    memcpy(rstate_dest->rp_regist_key, rstate_src->rp_regist_key, sizeof(rstate_dest->rp_regist_key));
+  }
 }

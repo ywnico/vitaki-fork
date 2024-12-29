@@ -256,6 +256,7 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
     }
 
     if (btn_pressed(SCE_CTRL_SELECT) && added) {
+      delete_manual_host(host);
       // TODO delete from manual hosts
 
       // refresh tiles
