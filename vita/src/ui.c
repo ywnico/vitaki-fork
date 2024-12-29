@@ -154,7 +154,7 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
   }
   vita2d_draw_rectangle(x, y, HOST_SLOT_W, HOST_SLOT_H, COLOR_TILE_BG);
 
-  // Draw host name and host id
+  // Draw host name (nickname) and host id (mac)
   if (discovered) {
     vita2d_draw_texture(img_discovery_host, x, y);
     vita2d_font_draw_text(font, x + 68, y + 40, COLOR_WHITE, 40,
@@ -170,6 +170,18 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
     vita2d_font_draw_textf(font, x + 255, y + 23, COLOR_WHITE, 20,
                           "%X%X%X%X%X%X", host_mac[0], host_mac[1], host_mac[2],
                           host_mac[3], host_mac[4], host_mac[5]);
+  }
+
+  // Draw how many manually added instances of this console exist
+  if (discovered && registered) {
+    int num_mhosts = count_manual_hosts_of_console(host);
+    if (num_mhosts == 1) {
+      vita2d_font_draw_text(font, x + 10, y + HOST_SLOT_H - 10, COLOR_WHITE, 20, "(1 manual remote host)");
+    } else if (num_mhosts > 1) {
+      vita2d_font_draw_textf(font, x + 10, y + HOST_SLOT_H - 10, COLOR_WHITE, 20, "(%d manual remote hosts)", num_mhosts);
+    } else {
+      vita2d_font_draw_textf(font, x + 10, y + HOST_SLOT_H - 10, COLOR_WHITE, 20, "[%d manual remote hosts]", num_mhosts);
+    }
   }
 
   // Draw host address

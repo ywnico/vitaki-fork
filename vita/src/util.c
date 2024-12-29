@@ -7,6 +7,18 @@ void parse_b64(const char* val, uint8_t* dest, size_t len) {
   chiaki_base64_decode(val, get_base64_size(len), dest, &len);
 }
 
+void parse_mac(const char* mac_str, uint8_t* mac_dest) {
+  // Given a string of length 12, e.g. DEADBEEF0000, convert to 6 ints
+  for (int j = 0; j < 6; j++) {
+    char digit[3];
+    digit[0] = mac_str[2*j];
+    digit[1] = mac_str[2*j+1];
+    digit[2] = 0;
+
+    mac_dest[j] = strtol(digit, NULL, 16);
+  }
+}
+
 // void parse_b64(const char* val, uint8_t* dest, size_t len) {
 //   for (size_t i=0; i < len; i++) {
 //     sscanf(val+(i*2), "%02hhx", &(dest[i]));

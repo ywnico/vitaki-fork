@@ -17,18 +17,16 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
   CHIAKI_LOGI(&(context.log), "Saving discovered host...");
   // Check if the host is already known, and if not, locate a free spot for it
   uint8_t host_mac[6];
-  parse_b64(host->host_id, host_mac, sizeof(host_mac));
+  parse_mac(host->host_id, host_mac);
+
+  // 1) Check if there is an identical discovered host in context; return if so
+  // 2) Determine whether there is room in context for a new host to be added
   int target_idx = -1;
-  VitaChiakiHost* h;
-  // TODO fix this logic...
   for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
-    h = context.hosts[host_idx];
+    VitaChiakiHost* h = context.hosts[host_idx];
     if (h == NULL) {
-      // Found a free spot
-      if (target_idx < 0) {
-        target_idx = host_idx;
-        break;
-      }
+      target_idx = host_idx;
+      break;
     } else if (h->type & DISCOVERED) {
       if (mac_addrs_match(&(h->server_mac), &host_mac)) {
         // Already known discovered hosts, we can skip saving
@@ -36,24 +34,21 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
       }
     } else if (h->type & MANUALLY_ADDED) {
       if (mac_addrs_match(&(h->server_mac), &host_mac)) {
-        // Manually added host matched this discovered host, update
+        // Manually added host matched this discovered host, so there is space available
         target_idx = host_idx;
+        break;
       }
     }
   }
 
   // Maximum number of hosts reached, can't save host
-  // TODO: Indicate to user?
+  // TODO: Indicate to user
   if (target_idx < 0) {
     CHIAKI_LOGE(&(context.log), "Max # of hosts reached; could not save newly discovered host.");
     return;
   }
 
-  if (!h) {
-    h = (VitaChiakiHost*)malloc(sizeof(VitaChiakiHost));
-    h->registered_state = NULL;
-    h->hostname = NULL;
-  }
+  // print some info about the host
 
   CHIAKI_LOGI(&(context.log), "--");
   CHIAKI_LOGI(&(context.log), "Discovered Host:");
@@ -83,7 +78,11 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
   if(host->running_app_name)
     CHIAKI_LOGI(&(context.log), "Running App Name:                  %s%s", host->running_app_name, (strcmp(host->running_app_name, "Persona 5") == 0 ? " (best game ever)" : ""));
 
-  h->type |= DISCOVERED;
+
+  VitaChiakiHost* h = (VitaChiakiHost*)malloc(sizeof(VitaChiakiHost));
+  h->registered_state = NULL;
+  h->type = DISCOVERED;
+
   ChiakiTarget target = chiaki_discovery_host_system_version_target(host);
   CHIAKI_LOGI(&(context.log),   "Is PS5:                            %s", chiaki_target_is_ps5(target) ? "true" : "false");
   h->target = target;
@@ -95,9 +94,6 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
 
   CHIAKI_LOGI(&(context.log), "--");
 
-  context.hosts[target_idx] = h;
-  context.num_hosts++;
-
   // Check if the newly discovered host is a known registered one
   for (int rhost_idx = 0; rhost_idx < context.config.num_registered_hosts; rhost_idx++) {
     VitaChiakiHost* rhost =
@@ -105,18 +101,28 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
     if (rhost == NULL) {
       continue;
     }
+    /*CHIAKI_LOGI(&(context.log), "  Checking rhost %d for match", rhost_idx);
+    CHIAKI_LOGI(&(context.log), "  %X%X%X%X%X%X (r) vs %X%X%X%X%X%X\n",
+                rhost->server_mac[0], rhost->server_mac[1], rhost->server_mac[2], rhost->server_mac[3], rhost->server_mac[4], rhost->server_mac[5],
+                h->server_mac[0], h->server_mac[1], h->server_mac[2], h->server_mac[3], h->server_mac[4], h->server_mac[5]
+                );*/
 
-    // FIXME: Use MAC instead of name
-    printf("FOUND HOST\n");
-    printf("NAME1 %s\n", rhost->registered_state->server_nickname);
-    printf("NAME2 %s\n", h->discovery_state->host_name);
-    if (strcmp(rhost->registered_state->server_nickname, h->discovery_state->host_name) == 0) {
-      printf("FOUND MATCH\n");
+    if (mac_addrs_match(&(rhost->server_mac), &(h->server_mac))) {
+      CHIAKI_LOGI(&(context.log), "Found registered host (%s) matching discovered host (%s).",
+                  rhost->registered_state->server_nickname,
+                  h->discovery_state->host_name
+                  );
       h->registered_state = rhost->registered_state;
       h->type |= REGISTERED;
       break;
     }
   }
+
+  // Add to context
+  if (!context.hosts[target_idx]) context.num_hosts++;
+  context.hosts[target_idx] = h;
+
+  update_context_hosts(); // to remove any extra manual host copies
 }
 
 /// Called whenever new hosts are discovered
@@ -162,6 +168,9 @@ ChiakiErrorCode start_discovery(VitaChiakiDiscoveryCb cb, void* cb_user) {
   ChiakiErrorCode err = chiaki_discovery_service_init(&(context.discovery),
                                                       &opts, &(context.log));
   context.discovery_enabled = true;
+
+  update_context_hosts();
+
   return err;
 }
 
@@ -191,4 +200,6 @@ void stop_discovery() {
     free(context.discovery_cb_state);
     context.discovery_cb_state = NULL;
   }
+
+  update_context_hosts();
 }

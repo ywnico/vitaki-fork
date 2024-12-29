@@ -542,6 +542,22 @@ void update_context_hosts() {
     }
   }
 
+  // Remove any manual hosts matching discovered hosts
+  if (hide_remote_if_discovered) {
+    for (int i = 0; i < MAX_NUM_HOSTS; i++) {
+      VitaChiakiHost* mhost = context.hosts[i];
+      if (!(mhost && mhost->server_mac && (mhost->type & MANUALLY_ADDED))) continue;
+      for (int j = 0; j < MAX_NUM_HOSTS; j++) {
+        if (j == i) continue;
+        VitaChiakiHost* h = context.hosts[j];
+        if (!(h && h->server_mac && (h->type & DISCOVERED) && !(h->type & MANUALLY_ADDED))) continue;
+        if (mac_addrs_match(&(h->server_mac), &(mhost->server_mac))) {
+          context.hosts[i] = NULL;
+        }
+      }
+    }
+  }
+
 
   // Remove any empty slots
   for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
@@ -606,6 +622,25 @@ void update_context_hosts() {
 
   // Update num_hosts
   context.num_hosts = count_nonnull_context_hosts();
+}
+
+int count_manual_hosts_of_console(VitaChiakiHost* host) {
+  if (!host) return 0;
+  if (!host->server_mac) return 0;
+  int sum = 0;
+  for (int i = 0; i < context.config.num_manual_hosts; i++) {
+    VitaChiakiHost* mhost = context.config.manual_hosts[i];
+    if (!mhost) continue;
+    if (!mhost->server_mac) continue;
+    /*LOGD("CHECKING %X%X%X%X%X%X vs %X%X%X%X%X%X",
+         host->server_mac[0], host->server_mac[1], host->server_mac[2], host->server_mac[3], host->server_mac[4], host->server_mac[5],
+         mhost->server_mac[0], mhost->server_mac[1], mhost->server_mac[2], mhost->server_mac[3], mhost->server_mac[4], mhost->server_mac[5]
+         );*/
+    if (mac_addrs_match(&(host->server_mac), &(mhost->server_mac))) {
+      sum++;
+    }
+  }
+  return sum;
 }
 
 void copy_host(VitaChiakiHost* h_dest, VitaChiakiHost* h_src, bool copy_hostname) {
