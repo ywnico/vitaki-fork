@@ -429,7 +429,7 @@ char* text_input(MainWidgetId id, int x, int y, int w, int h, char* label,
   // TODO: If touched or X pressed, open up IME dialogue and update value
 }
 
-int number_input(MainWidgetId id, int x, int y, int w, int h, char* label, int value) {
+long int number_input(MainWidgetId id, int x, int y, int w, int h, char* label, long int value) {
   // -1 => blank
 
   // int to str
@@ -481,8 +481,9 @@ int number_input(MainWidgetId id, int x, int y, int w, int h, char* label, int v
         uint16_t*last_input = (result.button == SCE_IME_DIALOG_BUTTON_ENTER) ? IMEInput:u"";
         char IMEResult[SCE_IME_DIALOG_MAX_TEXT_LENGTH + 1];
         utf16_to_utf8(IMEInput, IMEResult);
-        LOGD("IME returned %s", IMEResult);
-        return strtoimax(strdup(IMEResult), NULL, 10);
+        long int num = strtol(strdup(IMEResult), NULL, 10);
+        LOGD("IME returned %s -> %d", IMEResult, num);
+        return num;
       }
     }
   }
@@ -738,7 +739,7 @@ bool draw_settings() {
   return true;
 }
 
-char* LINK_CODE = NULL;
+long int LINK_CODE = -1;
 char* LINK_CODE_LABEL = "Registration code";
 
 /// Draw the form to register a host
@@ -752,22 +753,33 @@ bool draw_registration_dialog() {
                         "Triangle: Register (clear any current registration);  Circle: Exit without registering."
                         );
 
-  char* text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 0, 30, 30, 600, 80, LINK_CODE_LABEL, LINK_CODE, 8);
-  if (text != NULL) {
-    if (LINK_CODE != NULL) free(LINK_CODE);
-    LINK_CODE = text;
-    }
+  // Draw isntructions
+  int info_font_size = 20;
+  int info_x = 30;
+  int info_y = 150;
+  int info_y_delta = 23;
+  vita2d_font_draw_text(font, info_x, info_y, COLOR_WHITE, info_font_size,
+                        "On your PS console, go to Settings > System > Remote Play and select Pair Device,"
+                        );
+  vita2d_font_draw_text(font, info_x, info_y + info_y_delta, COLOR_WHITE, info_font_size,
+                        "then enter the corresponding 8-digit code here (no spaces)."
+                        );
+
+  long int link_code = number_input(UI_MAIN_WIDGET_TEXT_INPUT | 0, 30, 30, 600, 80, LINK_CODE_LABEL, LINK_CODE);
+  if (link_code >= 0) {
+    LINK_CODE = link_code;
+  }
+
   if (btn_pressed(SCE_CTRL_TRIANGLE)) {
-    if ((LINK_CODE != NULL) && (strlen(LINK_CODE) != 0)) {
-      LOGD("User input link code: %s", LINK_CODE);
-      host_register(context.active_host, atoi(LINK_CODE));
+    if (LINK_CODE >= 0) {
+      LOGD("User input link code: %d", LINK_CODE);
+      host_register(context.active_host, LINK_CODE);
     } else {
       LOGD("User exited registration screen without inputting link code");
     }
   }
   if (btn_pressed(SCE_CTRL_CIRCLE) || btn_pressed(SCE_CTRL_TRIANGLE)) {
-    if (LINK_CODE != NULL) free(LINK_CODE);
-    LINK_CODE = NULL;
+    LINK_CODE = -1;
     context.ui_state.next_active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
     return false;
   }
