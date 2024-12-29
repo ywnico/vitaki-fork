@@ -38,6 +38,16 @@ Currently, Vitaki cannot detect the status of remote hosts. Therefore, when sele
 
 Note: if the remote host cannot be reached, it will get stuck on "Trying to request session" for 90 seconds and then time out. If the remote host was reachable but asleep, "Trying to request session" should fail after just a few seconds.
 
+## Known issues & troubleshooting
+- [Latency](https://github.com/ywnico/vitaki-fork/issues/12). On remote connections (not local WLAN), it's especially bad.
+- Crashes have been [reported](https://github.com/ywnico/vitaki-fork/issues/6) when multiple consoles are on the network.
+- Typically only one stream works per launch. If the screen becomes gray and unresponsive, restart Vitaki.
+
+If problems arise:
+- Try restarting Vitaki first.
+- Then, try deleting/renaming the config file (`ux0:data/vita-chiaki/chiaki.toml`). 
+- If that doesn't help, create a new [issue](https://github.com/ywnico/vitaki-fork/issues) (or comment on an existing issue).
+
 # Chiaki4deck
 
 ## [chiaki4deck](https://streetpea.github.io/chiaki4deck/)
