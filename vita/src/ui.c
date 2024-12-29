@@ -209,7 +209,7 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
       if (discovered && !registered) {
         active_tile_tooltip_msg = "Cross: begin pairing process";
       } else if (discovered && registered) {
-        active_tile_tooltip_msg = "Cross: start remote play";
+        active_tile_tooltip_msg = "Cross: start remote play;  Square: re-pair";
       } else if (added) {
         active_tile_tooltip_msg = "Cross: send wake signal and start remote play (wakeup takes time);  SELECT button: delete host (no confirmation)";
       } else {
@@ -301,10 +301,8 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
         return UI_HOST_ACTION_NONE;
       }
       return UI_HOST_ACTION_REGISTER;
-    } else if (mutable && btn_pressed(SCE_CTRL_TRIANGLE)) {
-      return UI_HOST_ACTION_DELETE;
-    } else if (mutable && btn_pressed(SCE_CTRL_SQUARE)) {
-      return UI_HOST_ACTION_EDIT;
+    } else if (discovered && btn_pressed(SCE_CTRL_SQUARE)) {
+      return UI_HOST_ACTION_REGISTER;
     }
   }
   if (is_touched(x, y, HOST_SLOT_W, HOST_SLOT_H)) {
@@ -719,18 +717,26 @@ bool draw_settings() {
   return true;
 }
 
-char* LINK_CODE;
+char* LINK_CODE = NULL;
 char* LINK_CODE_LABEL = "Registration code";
 
 /// Draw the form to register a host
 /// @return whether the dialog should keep rendering
 bool draw_registration_dialog() { 
+  // Draw instructions
+  int font_size = 18;
+  int tooltip_x = 10;
+  int tooltip_y = VITA_HEIGHT - font_size;
+  vita2d_font_draw_text(font, tooltip_x, tooltip_y, COLOR_WHITE, font_size,
+                        "Triangle: Register (clear any current registration);  Circle: Exit without registering."
+                        );
+
   char* text = text_input(UI_MAIN_WIDGET_TEXT_INPUT | 0, 30, 30, 600, 80, LINK_CODE_LABEL, LINK_CODE, 8);
   if (text != NULL) {
     if (LINK_CODE != NULL) free(LINK_CODE);
     LINK_CODE = text;
     }
-  if (btn_pressed(SCE_CTRL_CIRCLE)) {
+  if (btn_pressed(SCE_CTRL_TRIANGLE)) {
     if ((LINK_CODE != NULL) && (strlen(LINK_CODE) != 0)) {
       LOGD("User input link code: %s", LINK_CODE);
       host_register(context.active_host, atoi(LINK_CODE));
@@ -738,8 +744,12 @@ bool draw_registration_dialog() {
       LOGD("User exited registration screen without inputting link code");
     }
     context.ui_state.next_active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
-    // free(context.config.psn_account_id);
-    // context.config.psn_account_id = NULL;
+    return false;
+  }
+  if (btn_pressed(SCE_CTRL_CIRCLE)) {
+    if (LINK_CODE != NULL) free(LINK_CODE);
+    LINK_CODE = NULL;
+    context.ui_state.next_active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
     return false;
   }
   return true;
@@ -858,8 +868,10 @@ bool draw_add_host_dialog() {
                           );
   }
 
-  vita2d_font_draw_text(font, info_x, info_y + 12*info_y_delta, COLOR_WHITE, font_size,
-                        "Triangle: save and add host. Circle: Exit without saving."
+  int tooltip_x = 10;
+  int tooltip_y = VITA_HEIGHT - font_size;
+  vita2d_font_draw_text(font, tooltip_x, tooltip_y, COLOR_WHITE, font_size,
+                        "Triangle: save and add host;  Circle: Exit without saving."
                         );
 
   if (btn_pressed(SCE_CTRL_DOWN)) {
