@@ -35,6 +35,7 @@ static void regist_cb(ChiakiRegistEvent *event, void *user) {
     if (context.active_host->registered_state != NULL) {
       free(context.active_host->registered_state);
       context.active_host->registered_state = event->registered_host;
+      memcpy(&context.active_host->server_mac, &(event->registered_host->server_mac), 6);
       printf("FOUND HOST TO UPDATE\n");
       for (int rhost_idx = 0; rhost_idx < context.config.num_registered_hosts; rhost_idx++) {
         VitaChiakiHost* rhost =
@@ -43,10 +44,9 @@ static void regist_cb(ChiakiRegistEvent *event, void *user) {
           continue;
         }
 
-        // FIXME: Use MAC instead of name
         printf("NAME1 %s\n", rhost->registered_state->server_nickname);
         printf("NAME2 %s\n", context.active_host->registered_state->server_nickname);
-        if (strcmp(rhost->registered_state->server_nickname, context.active_host->registered_state->server_nickname) == 0) {
+        if ((rhost->server_mac) && (context.active_host->server_mac) && mac_addrs_match(&(rhost->server_mac), &(context.active_host->server_mac))) {
           printf("FOUND MATCH\n");
           context.config.registered_hosts[rhost_idx] = context.active_host;
           break;
@@ -54,6 +54,7 @@ static void regist_cb(ChiakiRegistEvent *event, void *user) {
       }
     } else {
       context.active_host->registered_state = event->registered_host;
+      memcpy(&context.active_host->server_mac, &(event->registered_host->server_mac), 6);
       context.config.registered_hosts[context.config.num_registered_hosts++] = context.active_host;
     }
 

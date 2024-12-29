@@ -743,10 +743,8 @@ bool draw_registration_dialog() {
     } else {
       LOGD("User exited registration screen without inputting link code");
     }
-    context.ui_state.next_active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
-    return false;
   }
-  if (btn_pressed(SCE_CTRL_CIRCLE)) {
+  if (btn_pressed(SCE_CTRL_CIRCLE) || btn_pressed(SCE_CTRL_TRIANGLE)) {
     if (LINK_CODE != NULL) free(LINK_CODE);
     LINK_CODE = NULL;
     context.ui_state.next_active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
