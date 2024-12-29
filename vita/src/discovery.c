@@ -112,8 +112,15 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
                   rhost->registered_state->server_nickname,
                   h->discovery_state->host_name
                   );
-      h->registered_state = rhost->registered_state;
       h->type |= REGISTERED;
+
+      // copy registered state
+      h->registered_state = NULL;
+      if (rhost->registered_state) {
+        h->registered_state = malloc(sizeof(ChiakiRegisteredHost));;
+        copy_host_registered_state(h->registered_state, rhost->registered_state);
+      }
+
       break;
     }
   }
