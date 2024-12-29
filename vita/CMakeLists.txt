@@ -1,9 +1,9 @@
 include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
 
-set(VITA_APP_NAME "chiaki")
+set(VITA_APP_NAME "Vitaki")
 set(VITA_TITLEID  "CHIAKI001")
 # TODO: Make it dynamic
-set(VITA_VERSION "00.05")
+set(VITA_VERSION "00.06")
 
 add_executable(${VITA_APP_NAME}.elf
     src/config.c
