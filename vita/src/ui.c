@@ -65,6 +65,8 @@ vita2d_texture *btn_register, *btn_register_active, *btn_add, *btn_add_active,
     *img_ps4_off, *img_ps4_rest, *img_ps5, *img_ps5_off, *img_ps5_rest,
     *img_header, *img_discovery_host;
 
+char* active_tile_tooltip_msg = "";
+
 /// Types of actions that can be performed on hosts
 typedef enum ui_host_action_t {
   UI_HOST_ACTION_NONE = 0,
@@ -195,6 +197,28 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
     }
   }
 
+  // set tooltip
+  if (is_active) {
+    if (at_rest) {
+      if (registered) {
+        active_tile_tooltip_msg = "Cross: send wake signal (you must then toggle off/on discovery to re-detect when awake)";
+      } else {
+        active_tile_tooltip_msg = "Cannot send wake signal to unregistered console.";
+      }
+    } else {
+      if (discovered && !registered) {
+        active_tile_tooltip_msg = "Cross: begin pairing process";
+      } else if (discovered && registered) {
+        active_tile_tooltip_msg = "Cross: start remote play";
+      } else if (added) {
+        active_tile_tooltip_msg = "Cross: send wake signal and start remote play (wakeup takes time);  SELECT button: delete host (no confirmation)";
+      } else {
+        // there should never be tiles that are neither discovered nor added
+        active_tile_tooltip_msg = "";
+      }
+    }
+  }
+
   // Handle navigation
   int btn = context.ui_state.button_state;
   int old_btn = context.ui_state.old_button_state;
@@ -229,6 +253,13 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
         context.ui_state.next_active_item =
             UI_MAIN_WIDGET_HOST_TILE | (host_slot - 1);
       }
+    }
+
+    if (btn_pressed(SCE_CTRL_SELECT) && added) {
+      // TODO delete from manual hosts
+
+      // refresh tiles
+      update_context_hosts();
     }
     // Determine action to perform
     // if (btn_pressed(SCE_CTRL_CROSS) && !registered) {
@@ -576,6 +607,10 @@ UIScreenType draw_main_menu() {
   default:
     tooltip_msg = "";
   }
+  if (context.ui_state.active_item & UI_MAIN_WIDGET_HOST_TILE) {
+    tooltip_msg = active_tile_tooltip_msg;
+  }
+
 
   if (strlen(tooltip_msg)) {
     vita2d_font_draw_text(font, tooltip_x, tooltip_y,
