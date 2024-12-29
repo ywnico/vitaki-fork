@@ -213,7 +213,7 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
   if (is_active) {
     if (at_rest) {
       if (registered) {
-        active_tile_tooltip_msg = "Cross: send wake signal (you must then toggle off/on discovery to re-detect when awake)";
+        active_tile_tooltip_msg = "Cross: send wake signal (note: console may be temporarily undetected during wakeup)";
       } else {
         active_tile_tooltip_msg = "Cannot send wake signal to unregistered console.";
       }

@@ -13,25 +13,39 @@
 #include "util.h"
 
 /// Save a newly discovered host into the context
-void save_discovered_host(ChiakiDiscoveryHost* host) {
+// Returns the index in context.hosts where it is saved (-1 if not saved)
+int save_discovered_host(ChiakiDiscoveryHost* host) {
   CHIAKI_LOGI(&(context.log), "Saving discovered host...");
   // Check if the host is already known, and if not, locate a free spot for it
   uint8_t host_mac[6];
   parse_mac(host->host_id, host_mac);
 
-  // 1) Check if there is an identical discovered host in context; return if so
-  // 2) Determine whether there is room in context for a new host to be added
+  // Check if there is an identical discovered host in context; return if so
+  for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
+    VitaChiakiHost* h = context.hosts[host_idx];
+    if (h && (h->type & DISCOVERED)) {
+      if (mac_addrs_match(&(h->server_mac), &host_mac)) {
+        // Already known discovered host. Just copy the discovery state and exit.
+        if (h->discovery_state && (h->discovery_state != host)) {
+          free(h->discovery_state);
+        }
+        h->discovery_state =
+            (ChiakiDiscoveryHost*)malloc(sizeof(ChiakiDiscoveryHost));
+        memcpy(h->discovery_state, host, sizeof(ChiakiDiscoveryHost));
+        if (h->hostname) free(h->hostname);
+        h->hostname = strdup(h->discovery_state->host_addr);
+        return host_idx;
+      }
+    }
+  }
+
+  // Determine whether there is room in context for a new host to be added
   int target_idx = -1;
   for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
     VitaChiakiHost* h = context.hosts[host_idx];
     if (h == NULL) {
       target_idx = host_idx;
       break;
-    } else if (h->type & DISCOVERED) {
-      if (mac_addrs_match(&(h->server_mac), &host_mac)) {
-        // Already known discovered hosts, we can skip saving
-        return;
-      }
     } else if (h->type & MANUALLY_ADDED) {
       if (mac_addrs_match(&(h->server_mac), &host_mac)) {
         // Manually added host matched this discovered host, so there is space available
@@ -45,7 +59,7 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
   // TODO: Indicate to user
   if (target_idx < 0) {
     CHIAKI_LOGE(&(context.log), "Max # of hosts reached; could not save newly discovered host.");
-    return;
+    return -1;
   }
 
   // print some info about the host
@@ -130,13 +144,42 @@ void save_discovered_host(ChiakiDiscoveryHost* host) {
   context.hosts[target_idx] = h;
 
   update_context_hosts(); // to remove any extra manual host copies
+
+  return target_idx;
+}
+
+// remove discovered hosts from context except those with index in discovered_idxs
+void remove_lost_discovered_hosts(int* discovered_idxs, size_t discovered_hosts_count) {
+  for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
+    VitaChiakiHost* h = context.hosts[host_idx];
+    if (h && (h->type & DISCOVERED)) {
+      bool is_lost = true;
+      for (int j = 0; j < discovered_hosts_count; j++) {
+        if (host_idx == discovered_idxs[j]) {
+          is_lost = false;
+          break;
+        }
+      }
+      if (is_lost) {
+        CHIAKI_LOGI(&(context.log), "Removing lost host from context (idx %d)", host_idx);
+        // free and remove from context
+        host_free(h);
+        context.hosts[host_idx] = NULL;
+      }
+    }
+  }
+
+  update_context_hosts();
 }
 
 /// Called whenever new hosts are discovered
 void discovery_cb(ChiakiDiscoveryHost* hosts, size_t hosts_count, void* user) {
+  int discovered_idxs[hosts_count];
   for (int dhost_idx = 0; dhost_idx < hosts_count; dhost_idx++) {
-    save_discovered_host(&hosts[dhost_idx]);
+    discovered_idxs[dhost_idx] = save_discovered_host(&hosts[dhost_idx]);
   }
+
+  remove_lost_discovered_hosts(discovered_idxs, hosts_count);
 
   // Call caller-defined callback
   VitaChiakiDiscoveryCallbackState* cb_state =
