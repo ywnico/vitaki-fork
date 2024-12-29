@@ -223,7 +223,7 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
       } else if (discovered && registered) {
         active_tile_tooltip_msg = "Cross: start remote play;  Square: re-pair";
       } else if (added) {
-        active_tile_tooltip_msg = "Cross: send wake signal and start remote play (wakeup takes time);  SELECT button: delete host (no confirmation)";
+        active_tile_tooltip_msg = "Cross: send wake signal and/or start remote play (wakeup takes time);  SELECT button: delete host (no confirmation)";
       } else {
         // there should never be tiles that are neither discovered nor added
         active_tile_tooltip_msg = "";
@@ -301,6 +301,8 @@ UIHostAction host_tile(int host_slot, VitaChiakiHost* host) {
       if (at_rest) {
         return UI_HOST_ACTION_WAKEUP;
       } else {
+        // since we don't know if the remote host is awake, send wakeup signal
+        if (added) host_wakeup(context.active_host);
         vita2d_end_drawing();
         vita2d_common_dialog_update();
         vita2d_swap_buffers();

@@ -82,8 +82,8 @@ int host_register(VitaChiakiHost* host, int pin) {
 }
 
 int host_wakeup(VitaChiakiHost* host) {
-  if (!host->hostname || !host->discovery_state) {
-    LOGE("Missing hostname or discovery_state. Cannot send wakeup signal.");
+  if (!host->hostname) {
+    LOGE("Missing hostname. Cannot send wakeup signal.");
     return 1;
   }
   LOGD("Attempting to send wakeup signal....");
