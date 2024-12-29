@@ -1,4 +1,4 @@
-# Vitaki fork notes
+# Vitaki fork
 
 This is ywnico's fork of [aa's Vitaki](https://git.catvibers.me/aa/chiaki). AA deserves all the credit for the initial port of Chiaki to Vita.
 
@@ -8,7 +8,7 @@ This fork builds on AA's work with the following updates:
     - Note: `Select` + `Start` sends the PS (home) button
 3. Implemented remote play (with manually-specified remote IP addresses)
 4. Made debug logs visible, added tooltips on some buttons
-5. Fixed instant deconnection bug
+5. Fixed instant disconnection bug
 6. Disabled `vblank_wait` and set fps to 30 to reduce lag.
     - NOTE: the fps in the config file (`chiaki.toml`) will be ignored
 7. Merged in updates from chiaki4deck (improved some connection issues)
@@ -35,6 +35,8 @@ UDP holepunching is not supported. Instead, a remote connection requires a stati
 If you are on the local network, your console will be discovered locally and a separate tile for remote connection will not be shown. If you want to test on the local network, turn off discovery (wifi icon in the toolbar).
 
 Currently, Vitaki cannot detect the status of remote hosts. Therefore, when selecting one, it will both send the wakeup signal and immediately try to start remote play. If the console was asleep, then this first attempt at remote play will fail, so try again in 10 or 15 seconds.
+
+Note: if the remote host cannot be reached, it will get stuck on "Trying to request session" for 90 seconds and then time out. If the remote host was reachable but asleep, "Trying to request session" should fail after just a few seconds.
 
 # Chiaki4deck
 
