@@ -134,6 +134,7 @@ void config_parse(VitaChiakiConfig* cfg) {
           parse_b64(datum.u.s, host->server_mac, 6);
           printf("MAC %X%X%X%X%X%X\n", host->server_mac[0], host->server_mac[1], host->server_mac[2],
                           host->server_mac[3], host->server_mac[4], host->server_mac[5]);
+          memcpy(&rstate->server_mac, &(host->server_mac), 6);
           free(datum.u.s);
         }
         datum = toml_string_in(host_cfg, "server_nickname");
@@ -196,8 +197,14 @@ void config_parse(VitaChiakiConfig* cfg) {
     toml_array_t* manual_hosts = toml_array_in(parsed, "manual_hosts");
     if (manual_hosts && toml_array_kind(manual_hosts) == 't') {
       int num_mhosts = toml_array_nelem(manual_hosts);
+      LOGD("Found %d manual hosts", num_mhosts);
       for (int i=0; i < MIN(MAX_NUM_HOSTS, num_mhosts) ; i++) {
-        VitaChiakiHost* host;
+        VitaChiakiHost* host = NULL;
+
+        bool has_mac = false;
+        bool has_hostname = false;
+        bool has_registration = false;
+
         toml_table_t* host_cfg = toml_table_at(manual_hosts, i);
         datum = toml_string_in(host_cfg, "server_mac");
         uint8_t server_mac[6];
@@ -205,33 +212,42 @@ void config_parse(VitaChiakiConfig* cfg) {
           // We have a MAC for the manual host, try to find corresponding
           // registered host
           parse_b64(datum.u.s, server_mac, sizeof(server_mac));
+          has_mac = true;
           free(datum.u.s);
           for (int hidx=0; hidx < cfg->num_registered_hosts; hidx++) {
             uint8_t* candidate_mac = cfg->registered_hosts[hidx]->server_mac;
-            for (int j=0; j < sizeof(server_mac); j++) {
-              if (candidate_mac[j] == server_mac[j]) {
-                host = cfg->registered_hosts[hidx];
+            if (candidate_mac) {
+              if (mac_addrs_match(&server_mac, candidate_mac)) {
+                // copy registered host (TODO for the registered_state, should we use a pointer instead?)
+                host = malloc(sizeof(VitaChiakiHost));
+                copy_host(host, cfg->registered_hosts[hidx], false);
+                host->type = REGISTERED;
+                has_registration = true;
                 break;
               }
             }
           }
         }
         if (!host) {
-          // No corresponding registered host found, create new host and assign
-          // MAC if specified.
-          host = malloc(sizeof(VitaChiakiHost));
-          if (datum.ok) {
-            memcpy(host->server_mac, server_mac, sizeof(server_mac));
-          }
+          // No corresponding registered host found. Don't save.
+          CHIAKI_LOGW(&(context.log), "Manual host missing registered host.");
+          continue;
         }
+
+        host->type |= MANUALLY_ADDED;
+        host->type &= ~DISCOVERED; // ensure discovered is off
 
         datum = toml_string_in(host_cfg, "hostname");
         if (datum.ok) {
           host->hostname = datum.u.s;
+          has_hostname = true;
+        }
+
+        if (has_hostname && has_mac) {
           cfg->manual_hosts[i] = host;
           cfg->num_manual_hosts++;
         } else {
-          CHIAKI_LOGW(&(context.log), "Failed to parse manual host due to missing hostname.");
+          CHIAKI_LOGW(&(context.log), "Failed to parse manual host due to missing hostname or mac.");
           free(host);
         }
       }
@@ -343,8 +359,6 @@ void config_serialize(VitaChiakiConfig* cfg) {
 
   for (int i = 0; i < cfg->num_manual_hosts; i++) {
     VitaChiakiHost* host = cfg->manual_hosts[i];
-    fprintf(fp, "\n\n[[manual_hosts]]\n");
-    fprintf(fp, "hostname = \"%s\"\n", host->hostname);
     uint8_t* mac = NULL;
     for (int m = 0; m < 6; m++) {
       if (host->server_mac[m] != 0) {
@@ -353,6 +367,9 @@ void config_serialize(VitaChiakiConfig* cfg) {
       }
     }
     if (mac) {
+      // only save if mac is valid
+      fprintf(fp, "\n\n[[manual_hosts]]\n");
+      fprintf(fp, "hostname = \"%s\"\n", host->hostname);
       serialize_b64(fp, "server_mac", mac, 6);
     }
   }

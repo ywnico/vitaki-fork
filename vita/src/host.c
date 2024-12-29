@@ -12,20 +12,20 @@
 #include <chiaki/base64.h>
 #include <chiaki/session.h>
 
-void host_init(VitaChiakiHost* host) {
+void host_free(VitaChiakiHost *host) {
+  if (host) {
+    if (host->discovery_state) {
+      free(host->discovery_state);
+    }
+    if (host->registered_state) {
+      free(host->registered_state);
+    }
+    if (host->hostname) {
+      free(host->hostname);
+    }
+  }
 }
 
-void host_free(VitaChiakiHost* host) {
-  if (host->discovery_state) {
-    free(host->discovery_state);
-  }
-  if (host->registered_state) {
-    free(host->registered_state);
-  }
-  if (host->hostname) {
-    free(host->hostname);
-  }
-}
 ChiakiRegist regist = {};
 static void regist_cb(ChiakiRegistEvent *event, void *user) {
   LOGD("regist event %d", event->type);
@@ -35,6 +35,7 @@ static void regist_cb(ChiakiRegistEvent *event, void *user) {
     if (context.active_host->registered_state != NULL) {
       free(context.active_host->registered_state);
       context.active_host->registered_state = event->registered_host;
+      memcpy(&context.active_host->server_mac, &(event->registered_host->server_mac), 6);
       printf("FOUND HOST TO UPDATE\n");
       for (int rhost_idx = 0; rhost_idx < context.config.num_registered_hosts; rhost_idx++) {
         VitaChiakiHost* rhost =
@@ -43,10 +44,9 @@ static void regist_cb(ChiakiRegistEvent *event, void *user) {
           continue;
         }
 
-        // FIXME: Use MAC instead of name
         printf("NAME1 %s\n", rhost->registered_state->server_nickname);
         printf("NAME2 %s\n", context.active_host->registered_state->server_nickname);
-        if (strcmp(rhost->registered_state->server_nickname, context.active_host->registered_state->server_nickname) == 0) {
+        if ((rhost->server_mac) && (context.active_host->server_mac) && mac_addrs_match(&(rhost->server_mac), &(context.active_host->server_mac))) {
           printf("FOUND MATCH\n");
           context.config.registered_hosts[rhost_idx] = context.active_host;
           break;
@@ -54,6 +54,7 @@ static void regist_cb(ChiakiRegistEvent *event, void *user) {
       }
     } else {
       context.active_host->registered_state = event->registered_host;
+      memcpy(&context.active_host->server_mac, &(event->registered_host->server_mac), 6);
       context.config.registered_hosts[context.config.num_registered_hosts++] = context.active_host;
     }
 
@@ -81,10 +82,16 @@ int host_register(VitaChiakiHost* host, int pin) {
 }
 
 int host_wakeup(VitaChiakiHost* host) {
-  if (!host->hostname || !host->discovery_state) {
+  if (!host->hostname) {
+    LOGE("Missing hostname. Cannot send wakeup signal.");
     return 1;
   }
-  chiaki_discovery_wakeup(&context.log, context.discovery_enabled ? &context.discovery.discovery : NULL, host->hostname, *host->registered_state->rp_regist_key, chiaki_target_is_ps5(host->target));
+  LOGD("Attempting to send wakeup signal....");
+	uint64_t credential = (uint64_t)strtoull(host->registered_state->rp_regist_key, NULL, 16);
+  chiaki_discovery_wakeup(&context.log,
+                          context.discovery_enabled ? &context.discovery.discovery : NULL,
+                          host->hostname, credential,
+                          chiaki_target_is_ps5(host->target));
   return 0;
 }
 
@@ -359,8 +366,6 @@ int host_stream(VitaChiakiHost* host) {
 		context.config.resolution, context.config.fps);
   // profile.bitrate = 15000;
 	// Build chiaki ps4 stream session
-	ChiakiAudioSink audio_sink;
-	chiaki_opus_decoder_init(&context.stream.opus_decoder, &context.log);
 	ChiakiConnectInfo chiaki_connect_info = {};
 
 	chiaki_connect_info.host = host->hostname;
@@ -380,6 +385,8 @@ int host_stream(VitaChiakiHost* host) {
   init_controller_map(&(context.stream.vcmi), context.config.controller_map_id);
 	context.stream.session_init = true;
 	// audio setting_cb and frame_cb
+	ChiakiAudioSink audio_sink;
+	chiaki_opus_decoder_init(&context.stream.opus_decoder, &context.log);
 	chiaki_opus_decoder_set_cb(&context.stream.opus_decoder, vita_audio_init, vita_audio_cb, NULL);
 	chiaki_opus_decoder_get_sink(&context.stream.opus_decoder, &audio_sink);
 	chiaki_session_set_audio_sink(&context.stream.session, &audio_sink);
@@ -418,4 +425,257 @@ bool mac_addrs_match(MacAddr* a, MacAddr* b) {
     }
   }
   return true;
+}
+
+/// Save a new manual host into the context, given existing registered host and new remote ip ("hostname")
+void save_manual_host(VitaChiakiHost* rhost, char* new_hostname) {
+  if ((!rhost->server_mac)) {
+    CHIAKI_LOGE(&(context.log), "Failed to get registered host mac; could not save.");
+  }
+
+  for (int i = 0; i < context.config.num_manual_hosts; i++) {
+    VitaChiakiHost* h = context.config.manual_hosts[i];
+    if (mac_addrs_match(&(h->server_mac), &(rhost->server_mac))) {
+      if (strcmp(h->hostname, new_hostname) == 0) {
+        // this manual host already exists (same mac addr and hostname)
+        CHIAKI_LOGW(&(context.log), "Duplicate manual host. Not saving.");
+        return;
+      }
+    }
+  }
+
+  VitaChiakiHost* newhost = (VitaChiakiHost*)malloc(sizeof(VitaChiakiHost));
+  copy_host(newhost, rhost, false);
+  newhost->hostname = strdup(new_hostname);
+  newhost->type = REGISTERED | MANUALLY_ADDED;
+
+  CHIAKI_LOGI(&(context.log), "--");
+  CHIAKI_LOGI(&(context.log), "Adding manual host:");
+
+  if(newhost->hostname)
+    CHIAKI_LOGI(&(context.log), "Host Name (address):               %s", newhost->hostname);
+  if(newhost->server_mac) {
+    CHIAKI_LOGI(&(context.log), "Host MAC:                          %X%X%X%X%X%X\n", newhost->server_mac[0], newhost->server_mac[1], newhost->server_mac[2], newhost->server_mac[3], newhost->server_mac[4], newhost->server_mac[5]);
+  }
+  CHIAKI_LOGI(&(context.log),   "Is PS5:                            %s", chiaki_target_is_ps5(newhost->target) ? "true" : "false");
+
+  CHIAKI_LOGI(&(context.log), "--");
+
+  if (context.config.num_manual_hosts >= MAX_NUM_HOSTS) { // TODO change to manual max
+    CHIAKI_LOGE(&(context.log), "Max manual hosts reached; could not save.");
+    return;
+  }
+
+  // Save to manual hosts
+  context.config.manual_hosts[context.config.num_manual_hosts++] = newhost;
+
+  // Save config
+  config_serialize(&context.config);
+
+  LOGD("> UPDATE CONTEXT...");
+  // update hosts in context
+  update_context_hosts();
+  LOGD("> UPDATE CONTEXT DONE");
+}
+
+
+void delete_manual_host(VitaChiakiHost* mhost) {
+
+  for (int i = 0; i < context.config.num_manual_hosts; i++) {
+    VitaChiakiHost* h = context.config.manual_hosts[i];
+    if (h == mhost) { // same object
+      context.config.manual_hosts[i] = NULL;
+    }
+  }
+  host_free(mhost);
+
+  // reorder manual hosts
+  for (int i = 0; i < context.config.num_manual_hosts; i++) {
+    VitaChiakiHost* h = context.config.manual_hosts[i];
+    if (!h) {
+      for (int j = i+1; j < context.config.num_manual_hosts; j++) {
+        context.config.manual_hosts[j-1] = context.config.manual_hosts[j];
+      }
+      context.config.manual_hosts[context.config.num_manual_hosts-1] = NULL;
+      context.config.num_manual_hosts--;
+    }
+  }
+
+  // Save config
+  config_serialize(&context.config);
+
+  // update hosts in context
+  update_context_hosts();
+
+}
+
+int count_nonnull_context_hosts() {
+  int sum = 0;
+  for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
+    VitaChiakiHost *h = context.hosts[host_idx];
+    if (h) {
+      sum += 1;
+    }
+  }
+  return sum;
+}
+
+void update_context_hosts() {
+  bool hide_remote_if_discovered = true;
+
+  // Remove any no-longer-existent manual hosts
+  for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
+    VitaChiakiHost* h = context.hosts[host_idx];
+    if (h && (h->type & MANUALLY_ADDED)) {
+
+      // check if this host still exists
+      bool host_exists = false;
+      for (int i = 0; i < context.config.num_manual_hosts; i++) {
+        if (context.config.manual_hosts[i] == h) {
+          host_exists = true;
+          break;
+        }
+      }
+      if (!host_exists) {
+        context.hosts[host_idx] = NULL;
+      }
+    }
+  }
+
+  // Remove any manual hosts matching discovered hosts
+  if (hide_remote_if_discovered) {
+    for (int i = 0; i < MAX_NUM_HOSTS; i++) {
+      VitaChiakiHost* mhost = context.hosts[i];
+      if (!(mhost && mhost->server_mac && (mhost->type & MANUALLY_ADDED))) continue;
+      for (int j = 0; j < MAX_NUM_HOSTS; j++) {
+        if (j == i) continue;
+        VitaChiakiHost* h = context.hosts[j];
+        if (!(h && h->server_mac && (h->type & DISCOVERED) && !(h->type & MANUALLY_ADDED))) continue;
+        if (mac_addrs_match(&(h->server_mac), &(mhost->server_mac))) {
+          context.hosts[i] = NULL;
+        }
+      }
+    }
+  }
+
+
+  // Remove any empty slots
+  for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
+      VitaChiakiHost* h = context.hosts[host_idx];
+      if (!h) {
+        // slide all hosts back one slot
+        for (int j = host_idx+1; j < MAX_NUM_HOSTS; j++) {
+          context.hosts[j-1] = context.hosts[j];
+        }
+        context.hosts[MAX_NUM_HOSTS-1] = NULL;
+      }
+  }
+
+  // Add in manual hosts
+  for (int i = 0; i < context.config.num_manual_hosts; i++) {
+    VitaChiakiHost* mhost = context.config.manual_hosts[i];
+
+    // first, check if it (or the local discovered version of the same console) is already in context
+    bool already_in_context = false;
+    for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
+      VitaChiakiHost* h = context.hosts[host_idx];
+      if (!h) continue;
+      if ((!h->server_mac) || (!h->hostname)) continue;
+      if (mac_addrs_match(&(h->server_mac), &(mhost->server_mac))) {
+        // it's the same console
+
+        if ((h->type & DISCOVERED) && hide_remote_if_discovered) {
+          // found matching discovered console
+          already_in_context = true;
+          break;
+        }
+
+        if ((h->type & MANUALLY_ADDED) && (strcmp(h->hostname, mhost->hostname) == 0)) {
+          // found identical manual console
+          already_in_context = true;
+          break;
+        }
+      }
+    }
+
+    if (already_in_context) {
+      continue;
+    }
+
+    // the host is not in the context yet. Find an empty spot for it, if possible.
+    bool added_to_context = false;
+    for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
+      VitaChiakiHost* h = context.hosts[host_idx];
+      if (h == NULL) {
+        // empty spot
+        context.hosts[host_idx] = mhost;
+        added_to_context = true;
+        break;
+      }
+    }
+
+    if (!added_to_context) {
+      CHIAKI_LOGE(&(context.log), "Max # of hosts reached; could not add manual host %d to context.", i);
+    }
+
+  }
+
+  // Update num_hosts
+  context.num_hosts = count_nonnull_context_hosts();
+}
+
+int count_manual_hosts_of_console(VitaChiakiHost* host) {
+  if (!host) return 0;
+  if (!host->server_mac) return 0;
+  int sum = 0;
+  for (int i = 0; i < context.config.num_manual_hosts; i++) {
+    VitaChiakiHost* mhost = context.config.manual_hosts[i];
+    if (!mhost) continue;
+    if (!mhost->server_mac) continue;
+    /*LOGD("CHECKING %X%X%X%X%X%X vs %X%X%X%X%X%X",
+         host->server_mac[0], host->server_mac[1], host->server_mac[2], host->server_mac[3], host->server_mac[4], host->server_mac[5],
+         mhost->server_mac[0], mhost->server_mac[1], mhost->server_mac[2], mhost->server_mac[3], mhost->server_mac[4], mhost->server_mac[5]
+         );*/
+    if (mac_addrs_match(&(host->server_mac), &(mhost->server_mac))) {
+      sum++;
+    }
+  }
+  return sum;
+}
+
+void copy_host(VitaChiakiHost* h_dest, VitaChiakiHost* h_src, bool copy_hostname) {
+        h_dest->type = h_src->type;
+        h_dest->target = h_src->target;
+        if (h_src->server_mac) {
+          memcpy(&h_dest->server_mac, &(h_src->server_mac), 6);
+        }
+
+        h_dest->hostname = NULL;
+        if ((h_src->hostname) && copy_hostname) {
+          h_dest->hostname = strdup(h_src->hostname);
+        }
+
+        // copy registered state
+        h_dest->registered_state = NULL;
+        ChiakiRegisteredHost* rstate_src = h_src->registered_state;
+        if (rstate_src) {
+          ChiakiRegisteredHost* rstate_dest = malloc(sizeof(ChiakiRegisteredHost));
+          h_dest->registered_state = rstate_dest;
+          copy_host_registered_state(rstate_dest, rstate_src);
+        }
+
+        // don't copy discovery state
+        h_dest->discovery_state = NULL;
+}
+
+void copy_host_registered_state(ChiakiRegisteredHost* rstate_dest, ChiakiRegisteredHost* rstate_src) {
+  if (rstate_src) {
+    if (rstate_src->server_nickname) {
+      strncpy(rstate_dest->server_nickname, rstate_src->server_nickname, sizeof(rstate_dest->server_nickname));
+    }
+    rstate_dest->target = rstate_src->target;
+    memcpy(rstate_dest->rp_key, rstate_src->rp_key, sizeof(rstate_dest->rp_key));
+    rstate_dest->rp_key_type = rstate_src->rp_key_type;
+    memcpy(rstate_dest->rp_regist_key, rstate_src->rp_regist_key, sizeof(rstate_dest->rp_regist_key));
+  }
 }

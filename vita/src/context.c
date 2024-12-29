@@ -7,6 +7,7 @@
 #include "message_log.h"
 #include "context.h"
 #include "config.h"
+#include "ui.h"
 
 VitaChiakiContext context;
 
@@ -47,6 +48,13 @@ bool vita_chiaki_init_context() {
   context.mlog = message_log_create();
 
   write_message_log(context.mlog, "----- Debug log start -----"); // debug
+
+  // add manual hosts to context
+  update_context_hosts();
+
+  // init ui to select a certain button
+  context.ui_state.active_item = UI_MAIN_WIDGET_SETTINGS_BTN;
+  context.ui_state.next_active_item = context.ui_state.active_item;
 
   return true;
 }

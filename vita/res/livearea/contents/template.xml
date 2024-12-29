@@ -11,7 +11,7 @@
     <frame id="frame3">
         <liveitem>
             <text origin="background" align="center" line-align="center" text-valign="bottom">
-                <str size="50" bold="on" shadow="on">CHIAKI</str>
+                <str size="50" bold="on" shadow="off" color="#162d50">VITAKI</str>
             </text>
         </liveitem>
     </frame>
@@ -19,19 +19,9 @@
     <frame id="frame4">
         <liveitem>
             <text origin="background" line-break="on" pre-br="on" align="center" line-align="center" text-valign="top">
-                <str size="22" bold="off" shadow="on" color="#dddddd">AN OPEN SOURCE
+                <str size="22" bold="off" shadow="off" color="#162d50">AN OPEN SOURCE
 PS REMOTE PLAY CLIENT</str>
             </text>
         </liveitem>
     </frame>
-
-    <frame id="frame5">
-        <liveitem>
-            <text origin="background" align="right" line-align="right" text-valign="bottom" margin-bottom="0" margin-right="20">
-                <str size="18" bold="off" shadow="on" color="#999999">v0.0.1</str>
-            </text>
-        </liveitem>
-    </frame>
-
-
 </livearea>

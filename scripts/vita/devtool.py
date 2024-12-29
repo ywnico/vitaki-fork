@@ -108,7 +108,7 @@ def print_thread_info(thread, core=None, elf=None):
 
 
 def print_coredump(corepath: Path) -> None:
-    elfpath = Path(__file__).parent / '../../build/vita/chiaki.elf'
+    elfpath = Path(__file__).parent / '../../build/vita/Vitaki.elf'
     if not elfpath.exists():
         print('Unable to find ELF file, please build the app and trigger '
               'the crash that caused the coredump again on your Vita.',
@@ -175,7 +175,7 @@ def upload_app(hostname: str, with_assets: bool) -> None:
     # Can't overwrite running app, must kill it first
     _vitacompanion_send_cmd(hostname, 'destroy')
     time.sleep(0.2)
-    vpk_path = Path(__file__).parent / '../../build/vita/chiaki.vpk'
+    vpk_path = Path(__file__).parent / '../../build/vita/Vitaki.vpk'
     if not vpk_path.exists():
         print(COLOR_RED + "No Vita build found, please run the build script first." + COLOR_END)
         sys.exit(1)
@@ -186,7 +186,7 @@ def upload_app(hostname: str, with_assets: bool) -> None:
         ftp.cwd('ux0:/app/CHIAKI001')
     except error_perm as e:
         if e.args[0].startswith('550 '):
-            print(COLOR_RED + "Chiaki is not installed, please perform an initial installation of the VPK first!" + COLOR_END)
+            print(COLOR_RED + "Vitaki is not installed, please perform an initial installation of the VPK first!" + COLOR_END)
             sys.exit(1)
         raise e
     with zipfile.ZipFile(vpk_path) as zf:

@@ -14,7 +14,17 @@ typedef enum vitaki_controller_map_id_t {
   VITAKI_CONTROLLER_MAP_6      =  6, // L2, R2 front touchscreen lower corners; no L3 R3; touchpad front middle
   VITAKI_CONTROLLER_MAP_7      =  7, // L2, R2 front touchscreen upper corners; no L3 R3; touchpad front middle
   VITAKI_CONTROLLER_MAP_25     = 25, // L2, R2 front touchscreen upper corners; L3, R3 front touchscreen lower corners; no touchpad
-  VITAKI_CONTROLLER_MAP_YWNICO = 99, // map ywnico randomly came up with
+  VITAKI_CONTROLLER_MAP_99     = 99, // map ywnico randomly came up with
+  VITAKI_CONTROLLER_MAP_100    =  100, // L3, R3 rear touchscreen upper corners; L2, R2 rear touchscreen lower corners; touchpad entire front
+  VITAKI_CONTROLLER_MAP_101    =  101, // L3, R3 front touchscreen upper corners; L2, R2 front touchscreen lower corners; touchpad front middle
+  VITAKI_CONTROLLER_MAP_102    =  102, // L3, R3 front touchscreen lower corners; L2 R2 on back; touchpad front middle
+  VITAKI_CONTROLLER_MAP_103    =  103, // L3, R3 front touchscreen upper corners; L2 R2 on back; touchpad front middle
+  VITAKI_CONTROLLER_MAP_104    =  104, // no L3,R3,L2,R2 mapping; touchpad entire front
+  VITAKI_CONTROLLER_MAP_105    =  105, // no L3,R3,L2,R2,touchpad mapping
+  VITAKI_CONTROLLER_MAP_106    =  106, // L3, R3 front touchscreen lower corners; no L2 R2; touchpad front middle
+  VITAKI_CONTROLLER_MAP_107    =  107, // L3, R3 front touchscreen upper corners; no L2 R2; touchpad front middle
+  VITAKI_CONTROLLER_MAP_125    = 125, // L3, R3 front touchscreen upper corners; L2, R2 front touchscreen lower corners; no touchpad
+  VITAKI_CONTROLLER_MAP_199    = 199, // map ywnico randomly came up with (swap L2R2 <> L3R3)
 } VitakiControllerMapId;
 
 // Control buttons (used for array indices => start at 0)
