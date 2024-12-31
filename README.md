@@ -6,14 +6,15 @@ This fork builds on AA's work with the following updates:
 1. Implemented audio
 2. Added control mappings for L2, R2, L3, R3, and touchpad (trapezoid button), following the official ps4 remote play maps in `vs0:app/NPXS10013/keymap/`
     - Note: `Select` + `Start` sends the PS (home) button
-3. Implemented remote play (with manually-specified remote IP addresses)
-4. Made debug logs visible, added tooltips on some buttons
-5. Fixed instant disconnection bug
-6. Disabled `vblank_wait` and set fps to 30 to reduce lag.
+3. Implemented external network remote play (with manually-specified remote IP addresses)
+4. Fixed console wakeup
+5. Made debug logs visible, added tooltips on some buttons
+6. Fixed instant disconnection bug
+7. Disabled `vblank_wait` and set fps to 30 to reduce lag.
     - NOTE: the fps in the config file (`chiaki.toml`) will be ignored
-7. Merged in updates from chiaki4deck (improved some connection issues)
-8. Included [ghost's LiveArea icon fixes](https://git.catvibers.me/aa/chiaki/pulls/13)
-9. Many bug and crash fixes
+8. Merged in updates from chiaki4deck (improved some connection issues)
+9. Included [ghost's LiveArea icon fixes](https://git.catvibers.me/aa/chiaki/pulls/13)
+10. Many bug and crash fixes
 
 ## Instructions
 ### Local connection
@@ -22,7 +23,7 @@ This fork builds on AA's work with the following updates:
 3. Open Vitaki on PS Vita.
 4. Check settings (gear icon) to ensure your encoded PSN ID is there (if it's not automatically populated, or you accidentally deleted it, press START to re-detect it).
 5. The console should be automatically detected and appear as an icon.
-6. Select the console and Vitaki should ask for a registration code. On the PS5, navigate to `Settings > System > Remote Play` and select `Pair Device`. An 8-digit numeric code should appear; enter this into Vitaki and hit circle.
+6. Select the console and Vitaki should ask for a registration code. On the PS5, navigate to `Settings > System > Remote Play` and select `Pair Device`. An 8-digit numeric code should appear; enter this into Vitaki and hit triangle to save.
 7. Select the console again in Vitaki. It should now connect (and in the future, will not ask for the device pairing code).
 
 ### Remote connection
