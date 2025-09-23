@@ -17,6 +17,7 @@ typedef struct vita_chiaki_host_t {
   ChiakiTarget target;
   uint8_t server_mac[6];
   char* hostname;
+  bool is_priority;
 
   ChiakiDiscoveryHost* discovery_state;
   ChiakiRegisteredHost* registered_state;

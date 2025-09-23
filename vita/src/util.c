@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <chiaki/common.h>
 #include <chiaki/base64.h>
@@ -45,6 +46,20 @@ int parse_mac(const char* mac_str, uint8_t* mac_dest) {
     mac_dest[j] = strtol(digit, NULL, 16);
   }
   return 0;
+}
+
+bool mac_is_priority(uint8_t* host_mac) {
+  for (int p_i = 0; p_i < context.config.num_priority_host_macs; p_i++) {
+    bool _match = true;
+    for (int j = 0; j < 6; j++) {
+      if (host_mac[j] != context.config.priority_host_macs[p_i][j]) {
+        _match = false;
+        break;
+      }
+    }
+    if (_match) return true;
+  }
+  return false;
 }
 
 // void parse_b64(const char* val, uint8_t* dest, size_t len) {
