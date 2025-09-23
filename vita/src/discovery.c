@@ -70,6 +70,7 @@ int save_discovered_host(ChiakiDiscoveryHost* host) {
       target_idx = non_priority_idx;
       host_free(context.hosts[target_idx]);
       context.hosts[target_idx] = NULL;
+      context.num_hosts--;
     } else {
       // TODO: Indicate to user that host could not be saved
       CHIAKI_LOGE(&(context.log), "Max # of hosts reached; could not save newly discovered host.");
