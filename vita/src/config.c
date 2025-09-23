@@ -221,7 +221,7 @@ void config_parse(VitaChiakiConfig* cfg) {
     toml_array_t* manual_hosts = toml_array_in(parsed, "manual_hosts");
     if (manual_hosts && toml_array_kind(manual_hosts) == 't') {
       int num_mhosts = toml_array_nelem(manual_hosts);
-      LOGD("Found %d manual hosts", num_mhosts);
+      LOGD("Config file contains %d manual hosts", num_mhosts);
       for (int i=0; i < MIN(MAX_NUM_HOSTS, num_mhosts) ; i++) {
         VitaChiakiHost* host = NULL;
 
@@ -276,6 +276,38 @@ void config_parse(VitaChiakiConfig* cfg) {
         }
       }
     }
+
+    toml_array_t *priority_hosts = toml_array_in(parsed, "priority_hosts");
+    if (priority_hosts && toml_array_kind(priority_hosts) == 't') {
+      int num_phosts = toml_array_nelem(priority_hosts);
+      LOGD("Config file contains %d priority hosts", num_phosts);
+      for (int i = 0; i < MIN(MAX_NUM_HOSTS, num_phosts); i++) {
+        VitaChiakiHost *host = NULL;
+
+        bool has_mac = false;
+
+        toml_table_t *host_cfg = toml_table_at(priority_hosts, i);
+        datum = toml_string_in(host_cfg, "server_mac");
+        uint8_t server_mac[6];
+        if (datum.ok) {
+          // We have a MAC for the priority host
+          int parse_mac_err = parse_mac_hex_or_b64(datum.u.s, server_mac);
+          has_mac = (parse_mac_err == 0);
+          if (has_mac) {
+            LOGD("Priority MAC parse success: %s -> %X%X%X%X%X%X", datum.u.s,
+                 server_mac[0], server_mac[1], server_mac[2], server_mac[3],
+                 server_mac[4], server_mac[5]);
+            // TODO Save mac to a priority host array
+          } else {
+            LOGD("Priority MAC parse failure: %s", datum.u.s);
+          }
+          free(datum.u.s);
+        }
+      }
+    }
+
+
+
   }
 }
 
