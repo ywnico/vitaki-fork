@@ -1096,8 +1096,8 @@ bool draw_messages() {
     i_y ++;
   }
 
-  if (btn_pressed_hold(SCE_CTRL_UP)) {
-    if (overflow) {
+  if (overflow) {
+    if (btn_pressed_hold(SCE_CTRL_UP)) {
       int next_offset = line_offset - 1;
 
       if (next_offset == 1) next_offset = 0;
@@ -1106,16 +1106,20 @@ bool draw_messages() {
       if (next_offset < 0) next_offset = line_offset;
       context.ui_state.mlog_line_offset = next_offset;
     }
-  }
-  if (btn_pressed_hold(SCE_CTRL_DOWN)) {
-    if (overflow) {
-      int next_offset = line_offset + 1;
+    if (btn_pressed_hold(SCE_CTRL_DOWN)) {
+        int next_offset = line_offset + 1;
 
-      if (next_offset == max_line_offset - 1) next_offset = max_line_offset;
-      if (next_offset == 1) next_offset = 2;
+        if (next_offset == max_line_offset - 1) next_offset = max_line_offset;
+        if (next_offset == 1) next_offset = 2;
 
-      if (next_offset > max_line_offset) next_offset = max_line_offset;
-      context.ui_state.mlog_line_offset = next_offset;
+        if (next_offset > max_line_offset) next_offset = max_line_offset;
+        context.ui_state.mlog_line_offset = next_offset;
+    }
+    if (btn_pressed(SCE_CTRL_START)) {
+        context.ui_state.mlog_line_offset = 0;
+    }
+    if (btn_pressed(SCE_CTRL_SELECT)) {
+        context.ui_state.mlog_line_offset = max_line_offset;
     }
   }
 
