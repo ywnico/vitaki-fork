@@ -225,7 +225,7 @@ ChiakiErrorCode start_discovery(VitaChiakiDiscoveryCb cb, void* cb_user) {
   opts.cb_user = context.discovery_cb_state;
   opts.ping_ms = 500;
   opts.ping_initial_ms = opts.ping_ms;
-  opts.hosts_max = MAX_NUM_HOSTS;
+  opts.hosts_max = 32;
   opts.host_drop_pings = HOST_DROP_PINGS;
 
   sockaddr_in addr = {};
