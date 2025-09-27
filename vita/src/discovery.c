@@ -62,22 +62,6 @@ int save_discovered_host(ChiakiDiscoveryHost* host) {
     }
   }
 
-  // Maximum number of hosts reached
-  if (target_idx < 0) {
-    if (is_priority && (non_priority_idx >= 0)) {
-      // The newly discovered host is a priority one and an existing host is
-      // non-priority, so replace the latter.
-      target_idx = non_priority_idx;
-      host_free(context.hosts[target_idx]);
-      context.hosts[target_idx] = NULL;
-      context.num_hosts--;
-    } else {
-      // TODO: Indicate to user that host could not be saved
-      CHIAKI_LOGE(&(context.log), "Max # of hosts reached; could not save newly discovered host.");
-      return -1;
-    }
-  }
-
   // print some info about the host
 
   CHIAKI_LOGI(&(context.log), "--");
@@ -102,20 +86,39 @@ int save_discovered_host(ChiakiDiscoveryHost* host) {
   if(host->host_id)
     CHIAKI_LOGI(&(context.log), "Host ID:                           %s", host->host_id);
 
+  if(host_mac)
+    CHIAKI_LOGI(&(context.log), "Host MAC:                          %X%X%X%X%X%X", host_mac[0], host_mac[1], host_mac[2], host_mac[3], host_mac[4], host_mac[5]);
+
   if(host->running_app_titleid)
     CHIAKI_LOGI(&(context.log), "Running App Title ID:              %s", host->running_app_titleid);
 
   if(host->running_app_name)
     CHIAKI_LOGI(&(context.log), "Running App Name:                  %s%s", host->running_app_name, (strcmp(host->running_app_name, "Persona 5") == 0 ? " (best game ever)" : ""));
 
+  ChiakiTarget target = chiaki_discovery_host_system_version_target(host);
+  CHIAKI_LOGI(&(context.log),   "Is PS5:                            %s", chiaki_target_is_ps5(target) ? "true" : "false");
+  CHIAKI_LOGI(&(context.log),   "Is priority:                       %s", is_priority ? "true" : "false");
+
+  // Maximum number of hosts reached
+  if (target_idx < 0) {
+    if (is_priority && (non_priority_idx >= 0)) {
+      // The newly discovered host is a priority one and an existing host is
+      // non-priority, so replace the latter.
+      target_idx = non_priority_idx;
+      host_free(context.hosts[target_idx]);
+      context.hosts[target_idx] = NULL;
+      context.num_hosts--;
+    } else {
+      // TODO: Indicate to user that host could not be saved
+      CHIAKI_LOGE(&(context.log), "Max # of hosts reached; could not save newly discovered host.");
+      return -1;
+    }
+  }
+
 
   VitaChiakiHost* h = (VitaChiakiHost*)malloc(sizeof(VitaChiakiHost));
   h->registered_state = NULL;
   h->type = DISCOVERED;
-
-  ChiakiTarget target = chiaki_discovery_host_system_version_target(host);
-  CHIAKI_LOGI(&(context.log),   "Is PS5:                            %s", chiaki_target_is_ps5(target) ? "true" : "false");
-  CHIAKI_LOGI(&(context.log),   "Is priority:                       %s", is_priority ? "true" : "false");
   h->target = target;
   memcpy(&(h->server_mac), &host_mac, 6);
   h->discovery_state =
