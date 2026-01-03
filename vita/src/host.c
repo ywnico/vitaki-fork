@@ -176,9 +176,12 @@ static void *input_thread_func(void* user) {
   if (!vcmi.did_init) init_controller_map(&vcmi, context.config.controller_map_id);
 
   // Touchscreen setup
-	sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
+  bool enable_front_touch = (vcmi.in_out_btn[VITAKI_CTRL_IN_FRONTTOUCH_ANY] != VITAKI_CTRL_OUT_NONE);
+  if (enable_front_touch) {
+    sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
+    sceTouchEnableTouchForce(SCE_TOUCH_PORT_FRONT);
+  }
 	sceTouchSetSamplingState(SCE_TOUCH_PORT_BACK, SCE_TOUCH_SAMPLING_STATE_START);
-	sceTouchEnableTouchForce(SCE_TOUCH_PORT_FRONT);
 	sceTouchEnableTouchForce(SCE_TOUCH_PORT_BACK);
 	SceTouchData touch[SCE_TOUCH_PORT_MAX_NUM];
   int TOUCH_MAX_WIDTH = 1919;
