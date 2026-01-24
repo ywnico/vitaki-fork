@@ -210,8 +210,14 @@ static void *input_thread_func(void* user) {
     if (stream->is_streaming) {
       int start_time_us = sceKernelGetProcessTimeWide();
 
-      // get button state - use Ext2 to support L2/R2/PS button from external controllers on PSTV
-      sceCtrlPeekBufferPositiveExt2(0, &ctrl, 1);
+      // get button state
+      // use Ext2 to support L2/R2/PS button from external controllers on PSTV
+      // unless the user has specifically turned on the enable_analogsenhancer flag
+      if (context.config.enable_analogsenhancer) {
+        sceCtrlPeekBufferPositive(0, &ctrl, 1);
+      } else {
+        sceCtrlPeekBufferPositiveExt2(0, &ctrl, 1);
+      }
 
       // get touchscreen state
       for(int port = 0; port < SCE_TOUCH_PORT_MAX_NUM; port++) {

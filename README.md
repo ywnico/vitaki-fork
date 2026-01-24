@@ -44,6 +44,7 @@ Note: if the remote host cannot be reached, it will get stuck on "Trying to requ
 Some configuration lacks a UI but can be set in the config file located at `ux0:data/vita-chiaki/chiaki.toml`.
 - `circle_btn_confirm = true` swaps circle and cross in the main UI, so that circle is confirm and cross is cancel (`false` makes cross into confirm and circle into cancel). Note that this does not affect the button mappings in remote play, only in the UI before remote play starts.
 - `auto_discovery = false` makes Vitaki not start discovery on launch. It can still be started manually by selecting the wifi icon.
+- `enable_analogsenhancer = true` makes Vitaki-fork compatible with the [AnalogsEnhancer plugin](https://github.com/Rinnegatamante/AnalogsEnhancer/). This option is `false` by default, since compatibility with PSTV controllers is then broken.
 
 ## Known issues & troubleshooting
 - Latency. On remote connections (not local WLAN), it's especially bad. ([Relevant GitHub issue](https://github.com/ywnico/vitaki-fork/issues/12))

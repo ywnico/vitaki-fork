@@ -81,6 +81,8 @@ void config_parse(VitaChiakiConfig* cfg) {
 
   bool circle_btn_confirm_default = get_circle_btn_confirm_default();
   cfg->circle_btn_confirm = circle_btn_confirm_default;
+  bool enable_analogsenhancer_default = false;
+  cfg->enable_analogsenhancer = enable_analogsenhancer_default;
 
   if (access(CFG_FILENAME, F_OK) == 0) {
     FILE* fp = fopen(CFG_FILENAME, "r");
@@ -141,6 +143,9 @@ void config_parse(VitaChiakiConfig* cfg) {
 
       datum = toml_bool_in(settings, "circle_btn_confirm");
       cfg->circle_btn_confirm = datum.ok ? datum.u.b : circle_btn_confirm_default;
+
+      datum = toml_bool_in(settings, "enable_analogsenhancer");
+      cfg->enable_analogsenhancer = datum.ok ? datum.u.b : enable_analogsenhancer_default;
     }
 
     toml_array_t* regist_hosts = toml_array_in(parsed, "registered_hosts");
