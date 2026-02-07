@@ -1,22 +1,65 @@
 #include <stdio.h>
+#include <stdbool.h>
+#include <string.h>
+#include <chiaki/common.h>
 #include <chiaki/base64.h>
 #include <psp2/message_dialog.h>
 #include "util.h"
+#include "context.h"
 
-void parse_b64(const char* val, uint8_t* dest, size_t len) {
-  chiaki_base64_decode(val, get_base64_size(len), dest, &len);
+int parse_b64(const char* val, uint8_t* dest, size_t len) {
+  ChiakiErrorCode err = chiaki_base64_decode(val, get_base64_size(len), dest, &len);
+  if (err == CHIAKI_ERR_SUCCESS) return 0;
+  return 1;
 }
 
-void parse_mac(const char* mac_str, uint8_t* mac_dest) {
+int parse_mac_hex_or_b64(const char* mac_str, uint8_t* mac_dest) {
+  // Attempt to parse a hex or b64 mac address
+  size_t len = strnlen(mac_str, 20);
+  if (len < 12) {
+    // attempt to parse as b64
+    return parse_b64(mac_str, mac_dest, 6);
+  } else {
+    // attempt to parse as mac
+    return parse_mac(mac_str, mac_dest);
+  }
+}
+
+int parse_mac(const char* mac_str, uint8_t* mac_dest) {
   // Given a string of length 12, e.g. DEADBEEF0000, convert to 6 ints
+  // Allow : to be interspersed. E.g., DE:AD:BE:EF:00:00.
+
+  size_t len = strnlen(mac_str, 20);
+  if (len < 12) return 1;
+
+  int c_offset = 0;
   for (int j = 0; j < 6; j++) {
     char digit[3];
-    digit[0] = mac_str[2*j];
-    digit[1] = mac_str[2*j+1];
-    digit[2] = 0;
+
+    // move forward by one if there is a colon
+    if (mac_str[2*j + c_offset] == ':') c_offset++;
+
+    digit[0] = mac_str[2*j + c_offset];
+    digit[1] = mac_str[2*j+1 + c_offset];
+    digit[2] = 0; // null termination
 
     mac_dest[j] = strtol(digit, NULL, 16);
   }
+  return 0;
+}
+
+bool mac_is_priority(uint8_t* host_mac) {
+  for (int p_i = 0; p_i < context.config.num_priority_host_macs; p_i++) {
+    bool _match = true;
+    for (int j = 0; j < 6; j++) {
+      if (host_mac[j] != context.config.priority_host_macs[p_i][j]) {
+        _match = false;
+        break;
+      }
+    }
+    if (_match) return true;
+  }
+  return false;
 }
 
 // void parse_b64(const char* val, uint8_t* dest, size_t len) {

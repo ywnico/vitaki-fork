@@ -96,10 +96,42 @@ int SCE_CTRL_CANCEL  = SCE_CTRL_CIRCLE;
 char* confirm_btn_str = "Cross";
 char* cancel_btn_str  = "Circle";
 
+// button hold status
+int last_btn_held = 0;
+uint64_t last_btn_held_start_time = 0;
+uint64_t last_btn_held_time = 0;
+
 /// Check if a button has been newly pressed
 bool btn_pressed(SceCtrlButtons btn) {
   return (context.ui_state.button_state & btn) &&
          !(context.ui_state.old_button_state & btn);
+}
+
+/// Check if a button is being held down (return 25 times per second)
+bool btn_pressed_hold(SceCtrlButtons btn) {
+  if (context.ui_state.button_state & btn) {
+    uint64_t cur_time = sceKernelGetProcessTimeWide();
+    if (!(context.ui_state.old_button_state & btn)) {
+      // Button newly pressed
+      last_btn_held = context.ui_state.button_state;
+      last_btn_held_start_time = cur_time;
+      last_btn_held_time = cur_time;
+      return true;
+    }
+
+    uint64_t delay = 1000000/2;
+    if (cur_time - last_btn_held_start_time > 2 * 1000000) {
+      delay = 0;
+    } else if (cur_time - last_btn_held_start_time > 1000000/2) {
+      delay = 1000000/25;
+    }
+
+    if (cur_time - last_btn_held_time > delay) {
+      last_btn_held_time = cur_time;
+      return true;
+    }
+  }
+  return false;
 }
 
 /// Load all textures required for rendering the UI
@@ -1064,8 +1096,8 @@ bool draw_messages() {
     i_y ++;
   }
 
-  if (btn_pressed(SCE_CTRL_UP)) {
-    if (overflow) {
+  if (overflow) {
+    if (btn_pressed_hold(SCE_CTRL_UP)) {
       int next_offset = line_offset - 1;
 
       if (next_offset == 1) next_offset = 0;
@@ -1074,16 +1106,20 @@ bool draw_messages() {
       if (next_offset < 0) next_offset = line_offset;
       context.ui_state.mlog_line_offset = next_offset;
     }
-  }
-  if (btn_pressed(SCE_CTRL_DOWN)) {
-    if (overflow) {
-      int next_offset = line_offset + 1;
+    if (btn_pressed_hold(SCE_CTRL_DOWN)) {
+        int next_offset = line_offset + 1;
 
-      if (next_offset == max_line_offset - 1) next_offset = max_line_offset;
-      if (next_offset == 1) next_offset = 2;
+        if (next_offset == max_line_offset - 1) next_offset = max_line_offset;
+        if (next_offset == 1) next_offset = 2;
 
-      if (next_offset > max_line_offset) next_offset = max_line_offset;
-      context.ui_state.mlog_line_offset = next_offset;
+        if (next_offset > max_line_offset) next_offset = max_line_offset;
+        context.ui_state.mlog_line_offset = next_offset;
+    }
+    if (btn_pressed(SCE_CTRL_START)) {
+        context.ui_state.mlog_line_offset = 0;
+    }
+    if (btn_pressed(SCE_CTRL_SELECT)) {
+        context.ui_state.mlog_line_offset = max_line_offset;
     }
   }
 

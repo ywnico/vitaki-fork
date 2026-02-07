@@ -40,14 +40,14 @@ void log_cb_debugnet(ChiakiLogLevel lvl, const char *msg, void *user) {
 }
 
 bool vita_chiaki_init_context() {
-  config_parse(&context.config);
-
   // TODO: Load log level from config
   // TODO: Custom logging callback that logs to a file
   chiaki_log_init(&(context.log), CHIAKI_LOG_ALL & ~(CHIAKI_LOG_VERBOSE | CHIAKI_LOG_DEBUG), &log_cb_debugnet, NULL);
   context.mlog = message_log_create();
 
   write_message_log(context.mlog, "----- Debug log start -----"); // debug
+
+  config_parse(&context.config);
 
   // add manual hosts to context
   update_context_hosts();
