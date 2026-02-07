@@ -55,7 +55,8 @@ Some configuration lacks a UI but can be set in the config file located at `ux0:
 `circle_btn_confirm = true` swaps circle and cross in the main UI, so that circle is confirm and cross is cancel (`false` makes cross into confirm and circle into cancel). Note that this does not affect the button mappings in remote play, only in the UI before remote play starts.
 ### Disabling auto discovery
 `auto_discovery = false` makes Vitaki not start discovery on launch. It can still be started manually by selecting the wifi icon.
-- `enable_analogsenhancer = true` makes Vitaki-fork compatible with the [AnalogsEnhancer plugin](https://github.com/Rinnegatamante/AnalogsEnhancer/). This option is `false` by default, since compatibility with PSTV controllers is then broken.
+### Enabling AnalogsEnhancer plugin
+`enable_analogsenhancer = true` makes Vitaki-fork compatible with the [AnalogsEnhancer plugin](https://github.com/Rinnegatamante/AnalogsEnhancer/). This option is `false` by default, since compatibility with PSTV controllers is then broken.
 ### Priority hosts
 Experimental: I don't actually have enough consoles to confirm whether this feature works or not.
 
