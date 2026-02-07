@@ -1,5 +1,6 @@
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <chiaki/discoveryservice.h>
 #include <chiaki/log.h>
@@ -19,6 +20,8 @@ int save_discovered_host(ChiakiDiscoveryHost* host) {
   // Check if the host is already known, and if not, locate a free spot for it
   uint8_t host_mac[6];
   parse_mac(host->host_id, host_mac);
+
+  bool is_priority = mac_is_priority(host_mac);
 
   // Check if there is an identical discovered host in context; return if so
   for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
@@ -41,6 +44,7 @@ int save_discovered_host(ChiakiDiscoveryHost* host) {
 
   // Determine whether there is room in context for a new host to be added
   int target_idx = -1;
+  int non_priority_idx = -1;
   for (int host_idx = 0; host_idx < MAX_NUM_HOSTS; host_idx++) {
     VitaChiakiHost* h = context.hosts[host_idx];
     if (h == NULL) {
@@ -53,13 +57,9 @@ int save_discovered_host(ChiakiDiscoveryHost* host) {
         break;
       }
     }
-  }
-
-  // Maximum number of hosts reached, can't save host
-  // TODO: Indicate to user
-  if (target_idx < 0) {
-    CHIAKI_LOGE(&(context.log), "Max # of hosts reached; could not save newly discovered host.");
-    return -1;
+    if (!mac_is_priority(h->server_mac)) {
+      non_priority_idx = host_idx;
+    }
   }
 
   // print some info about the host
@@ -86,19 +86,39 @@ int save_discovered_host(ChiakiDiscoveryHost* host) {
   if(host->host_id)
     CHIAKI_LOGI(&(context.log), "Host ID:                           %s", host->host_id);
 
+  if(host_mac)
+    CHIAKI_LOGI(&(context.log), "Host MAC:                          %X%X%X%X%X%X", host_mac[0], host_mac[1], host_mac[2], host_mac[3], host_mac[4], host_mac[5]);
+
   if(host->running_app_titleid)
     CHIAKI_LOGI(&(context.log), "Running App Title ID:              %s", host->running_app_titleid);
 
   if(host->running_app_name)
     CHIAKI_LOGI(&(context.log), "Running App Name:                  %s%s", host->running_app_name, (strcmp(host->running_app_name, "Persona 5") == 0 ? " (best game ever)" : ""));
 
+  ChiakiTarget target = chiaki_discovery_host_system_version_target(host);
+  CHIAKI_LOGI(&(context.log),   "Is PS5:                            %s", chiaki_target_is_ps5(target) ? "true" : "false");
+  CHIAKI_LOGI(&(context.log),   "Is priority:                       %s", is_priority ? "true" : "false");
+
+  // Maximum number of hosts reached
+  if (target_idx < 0) {
+    if (is_priority && (non_priority_idx >= 0)) {
+      // The newly discovered host is a priority one and an existing host is
+      // non-priority, so replace the latter.
+      target_idx = non_priority_idx;
+      host_free(context.hosts[target_idx]);
+      context.hosts[target_idx] = NULL;
+      context.num_hosts--;
+    } else {
+      // TODO: Indicate to user that host could not be saved
+      CHIAKI_LOGE(&(context.log), "Max # of hosts reached; could not save newly discovered host.");
+      return -1;
+    }
+  }
+
 
   VitaChiakiHost* h = (VitaChiakiHost*)malloc(sizeof(VitaChiakiHost));
   h->registered_state = NULL;
   h->type = DISCOVERED;
-
-  ChiakiTarget target = chiaki_discovery_host_system_version_target(host);
-  CHIAKI_LOGI(&(context.log),   "Is PS5:                            %s", chiaki_target_is_ps5(target) ? "true" : "false");
   h->target = target;
   memcpy(&(h->server_mac), &host_mac, 6);
   h->discovery_state =
@@ -205,7 +225,7 @@ ChiakiErrorCode start_discovery(VitaChiakiDiscoveryCb cb, void* cb_user) {
   opts.cb_user = context.discovery_cb_state;
   opts.ping_ms = 500;
   opts.ping_initial_ms = opts.ping_ms;
-  opts.hosts_max = MAX_NUM_HOSTS;
+  opts.hosts_max = 32;
   opts.host_drop_pings = HOST_DROP_PINGS;
 
   sockaddr_in addr = {};

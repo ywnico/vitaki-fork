@@ -43,9 +43,25 @@ Note: if the remote host cannot be reached, it will get stuck on "Trying to requ
 
 ## Config settings
 Some configuration lacks a UI but can be set in the config file located at `ux0:data/vita-chiaki/chiaki.toml`.
-- `circle_btn_confirm = true` swaps circle and cross in the main UI, so that circle is confirm and cross is cancel (`false` makes cross into confirm and circle into cancel). Note that this does not affect the button mappings in remote play, only in the UI before remote play starts.
-- `auto_discovery = false` makes Vitaki not start discovery on launch. It can still be started manually by selecting the wifi icon.
+### Swapping circle/cross in UI
+`circle_btn_confirm = true` swaps circle and cross in the main UI, so that circle is confirm and cross is cancel (`false` makes cross into confirm and circle into cancel). Note that this does not affect the button mappings in remote play, only in the UI before remote play starts.
+### Disabling auto discovery
+`auto_discovery = false` makes Vitaki not start discovery on launch. It can still be started manually by selecting the wifi icon.
 - `enable_analogsenhancer = true` makes Vitaki-fork compatible with the [AnalogsEnhancer plugin](https://github.com/Rinnegatamante/AnalogsEnhancer/). This option is `false` by default, since compatibility with PSTV controllers is then broken.
+### Priority hosts
+Experimental: I don't actually have enough consoles to confirm whether this feature works or not.
+
+The Vitaki UI is limited to 4 consoles. If you are on a crowded network with many consoles and yours isn't showing up, you can manually add the following to the config file:
+```toml
+[[priority_hosts]]
+server_mac = "00:11:11:11:11:11"
+
+[[priority_hosts]]
+server_mac = "00:22:22:22:22:22"
+```
+and so on for each console you want to prioritize, where the MAC address is the LAN MAC address of your PS5/PS4 console (you can find it in `Settings > Network > Connection Status > View Connection Status`).
+
+Note that each additional priority host should have its own `[[priority_hosts]]` header above it. Also, be sure to quote the MAC address. If Vitaki crashes immediately on opening, it is probably due to an invalid TOML file breaking the parser.
 
 ## Known issues & troubleshooting
 - Latency. On remote connections (not local WLAN), it's especially bad. ([Relevant GitHub issue](https://github.com/ywnico/vitaki-fork/issues/12))
