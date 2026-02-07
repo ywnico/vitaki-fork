@@ -6,7 +6,7 @@ This is ywnico's fork of AAGaming's ([@AAGaming00](https://github.com/AAGaming00
 > [!IMPORTANT]
 > I do not plan to make more significant updates to vitaki-fork; getting it into a playable state was good enough for me. Thanks to everyone for using it, and to the many people who contributed PRs.
 >
-> Fortunately, @mauricio-gg has developed a greatly improved version: [VitaRPS5](https://github.com/mauricio-gg/vitaki-vitarps5)! It has better latency, an overhauled UI, and many, many other fixes and improvements. Keep having fun with remote play on Vita :)
+> Fortunately, [@mauricio-gg](https://github.com/mauricio-gg) has developed a greatly improved version: [VitaRPS5](https://github.com/mauricio-gg/vitaki-vitarps5)! It has better latency, an overhauled UI, and many, many other fixes and improvements. Keep having fun with remote play on Vita :)
 
 ## Updates made in this fork
 
