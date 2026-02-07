@@ -149,6 +149,9 @@ void init_controller_map(VitakiCtrlMapInfo* vcmi, VitakiControllerMapId controll
 
     vcmi->in_out_btn[VITAKI_CTRL_IN_REARTOUCH_UL] = VITAKI_CTRL_OUT_L3;
     vcmi->in_out_btn[VITAKI_CTRL_IN_REARTOUCH_UR] = VITAKI_CTRL_OUT_R3;
+  } else if (controller_map_id == VITAKI_CONTROLLER_MAP_200) {
+    // PSTV + PS4: disable all front touch mappings to avoid interference
+    // L2/R2 are handled by physical triggers, L3/R3 by buttons
   } else { // default, VITAKI_CONTROLLER_MAP_0
     vcmi->in_out_btn[VITAKI_CTRL_IN_L1]                  = VITAKI_CTRL_OUT_L1;
     vcmi->in_out_btn[VITAKI_CTRL_IN_R1]                  = VITAKI_CTRL_OUT_R1;

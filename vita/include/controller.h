@@ -25,6 +25,7 @@ typedef enum vitaki_controller_map_id_t {
   VITAKI_CONTROLLER_MAP_107    =  107, // L3, R3 front touchscreen upper corners; no L2 R2; touchpad front middle
   VITAKI_CONTROLLER_MAP_125    = 125, // L3, R3 front touchscreen upper corners; L2, R2 front touchscreen lower corners; no touchpad
   VITAKI_CONTROLLER_MAP_199    = 199, // map ywnico randomly came up with (swap L2R2 <> L3R3)
+  VITAKI_CONTROLLER_MAP_200    = 200, // PSTV + PS4: disable front touchpad and touch-region mappings
 } VitakiControllerMapId;
 
 // Control buttons (used for array indices => start at 0)

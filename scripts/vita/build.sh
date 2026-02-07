@@ -25,8 +25,8 @@ build_chiaki (){
 			-DCHIAKI_LIB_ENABLE_OPUS=ON
 	# fi
 	make -j$(nproc) -C "./build"
-	python3 ./scripts/vita/devtool.py --host $PSVITAIP upload
-	python3 ./scripts/vita/devtool.py --host $PSVITAIP launch
+	#python3 ./scripts/vita/devtool.py --host $PSVITAIP upload
+	#python3 ./scripts/vita/devtool.py --host $PSVITAIP launch
 	popd
 }
 
