@@ -1,6 +1,6 @@
 # Vitaki fork
 
-This is ywnico's fork of AAGaming's ([@AAGaming00](https://github.com/AAGaming00)) [Vitaki](https://git.catvibers.me/aa/chiaki). AAGaming did all the hard work of porting Chiaki to Vita. This fork just adds some features and fixes on top of that foundation.
+This is ywnico's fork of AAGaming's ([@AAGaming00](https://github.com/AAGaming00)) [Vitaki](https://git.catvibers.me/aa/chiaki). AAGaming did all the hard work of porting Chiaki to Vita, along with jbaiter_. This fork just adds some features and fixes on top of that foundation.
 
 ## 2026 Update (TLDR: check out [VitaRPS5](https://github.com/mauricio-gg/vitaki-vitarps5))
 > [!IMPORTANT]
